@@ -6,3 +6,10 @@ Performed the CD8 EBV, VZV Lytic vs Latent Antigen analysis. The analysis involv
 
 ### BEAM-T schematic experimental design
 <img width="694" alt="Screenshot 2024-11-22 at 1 35 47 PM" src="https://github.com/user-attachments/assets/0d9a24eb-da47-4fb4-894a-43126a704991">
+
+# Data Availability
+ATAC-seq and BEAM-T data have been deposited at GEO (accession numbers GSE275633, GSE275634) and are publicly available as of the date of publication. This study also analyzed existing, publicly available datasets (GEO GSE101609, dbGaP: phs002441.v1.p1).
+
+# Cite the Paper
+If you find the resource helpful or scientifically helped in your reserach please cite the paper
+https://www.biorxiv.org/content/10.1101/2024.07.26.605197v1
