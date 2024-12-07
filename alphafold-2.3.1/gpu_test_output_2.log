@@ -1,0 +1,19 @@
+no change     /diazlab/data3/.abhinav/tools/miniconda3/condabin/conda
+no change     /diazlab/data3/.abhinav/tools/miniconda3/bin/conda
+no change     /diazlab/data3/.abhinav/tools/miniconda3/bin/conda-env
+no change     /diazlab/data3/.abhinav/tools/miniconda3/bin/activate
+no change     /diazlab/data3/.abhinav/tools/miniconda3/bin/deactivate
+no change     /diazlab/data3/.abhinav/tools/miniconda3/etc/profile.d/conda.sh
+no change     /diazlab/data3/.abhinav/tools/miniconda3/etc/fish/conf.d/conda.fish
+no change     /diazlab/data3/.abhinav/tools/miniconda3/shell/condabin/Conda.psm1
+no change     /diazlab/data3/.abhinav/tools/miniconda3/shell/condabin/conda-hook.ps1
+no change     /diazlab/data3/.abhinav/tools/miniconda3/lib/python3.12/site-packages/xontrib/conda.xsh
+no change     /diazlab/data3/.abhinav/tools/miniconda3/etc/profile.d/conda.csh
+no change     /c4/home/ajain/.bashrc
+No action taken.
+Available devices: [StreamExecutorGpuDevice(id=0, process_index=0, slice_index=0)]
+Result of matrix multiplication (partial): [[1000. 1000. 1000. 1000. 1000.]
+ [1000. 1000. 1000. 1000. 1000.]
+ [1000. 1000. 1000. 1000. 1000.]
+ [1000. 1000. 1000. 1000. 1000.]
+ [1000. 1000. 1000. 1000. 1000.]]
