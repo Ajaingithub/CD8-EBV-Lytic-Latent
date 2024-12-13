@@ -3,8 +3,8 @@ Match_columns 110
 No_of_seqs    113 out of 9858
 Neff          6.4444
 Searched_HMMs 80799
-Date          Fri Dec  6 13:34:54 2024
-Command       /diazlab/data3/.abhinav/tools/miniconda3/envs/alphafold/bin/hhsearch -i /scratch/ajain/tmpq6gin8dd/query.a3m -o /scratch/ajain/tmpq6gin8dd/output.hhr -maxseq 1000000 -d /diazlab/data3/abhinav/resource/alphafold_database//pdb70/pdb70 
+Date          Sat Dec  7 12:16:12 2024
+Command       /diazlab/data3/.abhinav/tools/miniconda3/envs/alphafold/bin/hhsearch -i /scratch/ajain/tmpajk4suzy/query.a3m -o /scratch/ajain/tmpajk4suzy/output.hhr -maxseq 1000000 -d /diazlab/data3/abhinav/resource/alphafold_database//pdb70/pdb70 
 
  No Hit                             Prob E-value P-value  Score    SS Cols Query HMM  Template HMM
   1 5WTS_A Green fluorescent prote  99.4 1.8E-16 2.3E-21  127.2   0.0  101    6-109   244-351 (358)

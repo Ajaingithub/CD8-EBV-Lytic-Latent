@@ -1,1 +1,5 @@
 model.*
+*.pkl
+*.pdb
+*.log
+*.err

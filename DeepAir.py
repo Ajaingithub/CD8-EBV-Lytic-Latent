@@ -41,26 +41,30 @@ print(f"Model and tokenizer saved in: {output_dir}")
 #### Running the DeepAIR
 ### Preprocessing the files
 ## Step 1
+python step1.py \
+    --AIR_file_path ./sampledata/CoV-AbDab_example.csv \ 
+    --output_table ./sampledata/CoV-AbDab_example_CDR3Region.csv \ 
+    --output_fasta_folder ./sampledata/fasta \ 
 
 # step2.py
-export DBS=/diazlab/data3/abhinav/resource/alphafold_database
-singularity exec --writable-tmpfs \
---bind /diazlab,/francislab,/scratch \
-${DBS}/AlphaFold.sif \
-/app/run_alphafold.sh \
---use_gpu_relax=False \
---bfd_database_path=${DBS}/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt \
---uniref30_database_path=${DBS}/uniref30/UniRef30_2021_03 \
---pdb70_database_path=${DBS}/pdb70/pdb70 \
---uniref90_database_path=${DBS}/uniref90/uniref90.fasta \
---mgnify_database_path=${DBS}/mgnify/mgy_clusters_2022_05.fa \
---template_mmcif_dir=${DBS}/pdb_mmcif/mmcif_files/ \
---obsolete_pdbs_path=${DBS}/pdb_mmcif/obsolete.dat \
---data_dir=${DBS}/ \
---max_template_date=3000-01-01 \
---model_preset=monomer \
---output_dir=${PWD}/out/ \
---fasta_paths=SSYTGSRTLV_8844.fasta
+# export DBS=/diazlab/data3/abhinav/resource/alphafold_database
+# singularity exec --writable-tmpfs \
+# --bind /diazlab,/francislab,/scratch \
+# ${DBS}/AlphaFold.sif \
+# /app/run_alphafold.sh \
+# --use_gpu_relax=False \
+# --bfd_database_path=${DBS}/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt \
+# --uniref30_database_path=${DBS}/uniref30/UniRef30_2021_03 \
+# --pdb70_database_path=${DBS}/pdb70/pdb70 \
+# --uniref90_database_path=${DBS}/uniref90/uniref90.fasta \
+# --mgnify_database_path=${DBS}/mgnify/mgy_clusters_2022_05.fa \
+# --template_mmcif_dir=${DBS}/pdb_mmcif/mmcif_files/ \
+# --obsolete_pdbs_path=${DBS}/pdb_mmcif/obsolete.dat \
+# --data_dir=${DBS}/ \
+# --max_template_date=3000-01-01 \
+# --model_preset=monomer \
+# --output_dir=${PWD}/out/ \
+# --fasta_paths=SSYTGSRTLV_8844.fasta
 
 ## with using GPUs
 export DBS=/diazlab/data3/abhinav/resource/alphafold_database
@@ -82,30 +86,36 @@ ${DBS}/AlphaFold.sif \
 --output_dir=${PWD}/gpu_out_2/ \
 --fasta_paths=SSYTGSRTLV_8844.fasta
 
-### customize and see if it pick the GPU and getting the same files
-# export DBS=/diazlab/data3/abhinav/resource/alphafold_database
-# singularity exec --nv --writable-tmpfs \
-# --bind /diazlab,/francislab,/scratch \
-# ${DBS}/AlphaFold.sif \
-# /app/run_alphafold.sh \
-# --use_gpu_relax=True \
-# --bfd_database_path=${DBS}/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt \
-# --uniref30_database_path=${DBS}/uniref30/UniRef30_2021_03 \
-# --pdb70_database_path=${DBS}/pdb70/pdb70 \
-# --uniref90_database_path=${DBS}/uniref90/uniref90.fasta \
-# --mgnify_database_path=${DBS}/mgnify/mgy_clusters_2022_05.fa \
-# --template_mmcif_dir=${DBS}/pdb_mmcif/mmcif_files/ \
-# --obsolete_pdbs_path=${DBS}/pdb_mmcif/obsolete.dat \
-# --data_dir=${DBS}/ \
-# --max_template_date=3000-01-01 \
-# --model_preset=monomer \
-# --output_dir=${PWD}/gpu_out/ \
-# --fasta_paths=SSYTGSRTLV_8844.fasta
-
 ### Since we have to make some changes in the model.py. We cannot use the singularity image of the Jake. 
 # I have used Kaliana lab to perform local alpha fold installation
-
+# https://github.com/kalininalab/alphafold_non_docker
 # cd /diazlab/data3/.abhinav/tools/miniconda3/envs/deepair/lib/python3.8/site-packages/ && patch -p0 < $alphafold_path/docker/openmm.patch
+# # $alphafold_path variable is set to the alphafold git repo directory (absolute path)
+# conda install -y -c conda-forge openmm==7.5.1 pdbfixer
+# conda install nvidia/label/cuda-12.4.1::cuda-toolkit --no-channel-priority
+# conda install -y -c bioconda hmmer hhsuite==3.3.0 kalign2
+# pip install nvidia-cudnn-cu12==8.9.4.25
+# pip install nvidia-cublas-cu12==12.4.5.8
+# pip install --upgrade --no-cache-dir jax==0.4.11 jaxlib==0.4.11+cuda12.cudnn88 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+# pip install tensorflow[and-cuda]
+
+
+### Test if GPU is being able to called by JAX and tensorflow
+import jax
+import jax.numpy as jnp
+
+# Check available devices
+devices = jax.devices()
+print("Available devices:", devices)
+
+# Create a matrix of ones and perform a simple operation
+x = jnp.ones((1000, 1000))  # Create a 1000x1000 matrix of ones
+y = jnp.dot(x, x)           # Matrix multiplication (dot product)
+
+# Print a small part of the result to confirm
+print("Result of matrix multiplication (partial):", y[:5, :5])  # Print top-left 5x5 block
+
+# cd /diazlab/data3/.abhinav/tools/miniconda3/envs/alphafold2/lib/python3.8/site-packages/ && patch -p0 < $alphafold_path/docker/openmm.patch
 
 ### Checking if the GPU is working
 #!/bin/bash
@@ -141,7 +151,6 @@ print("Result of matrix multiplication (partial):", y[:5, :5])  # Print top-left
 EOF
 
 # End of script
-
 ### Running Step2
 DATA_DIR=/diazlab/data3/abhinav/resource/alphafold_database/   # Path to the directory containing the AlphaFold 2 downloaded data.
 FASTA_DIR=/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/DeepAIR/preprocessing_structure_feature/sampledata/fasta_2/ # Path to the directory containing the input FASTA files.
