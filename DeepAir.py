@@ -17,9 +17,9 @@
 # pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117
 
 import torch
-print(torch.__version__)  # Prints the installed PyTorch version
-print(torch.cuda.is_available())  # Should return True if CUDA is accessible
-print(torch.cuda.get_device_name(0))  # Prints the name of the GPU
+print(torch.__version__)  
+print(torch.cuda.is_available())  
+print(torch.cuda.get_device_name(0)) 
 
 import os
 from transformers import AutoModel, AutoTokenizer
@@ -66,7 +66,7 @@ python step1.py \
 # --output_dir=${PWD}/out/ \
 # --fasta_paths=SSYTGSRTLV_8844.fasta
 
-## with using GPUs
+## Using GPUs
 export DBS=/diazlab/data3/abhinav/resource/alphafold_database
 singularity exec --nv --writable-tmpfs \
 --bind /diazlab,/francislab,/scratch \
@@ -86,10 +86,12 @@ ${DBS}/AlphaFold.sif \
 --output_dir=${PWD}/gpu_out_2/ \
 --fasta_paths=SSYTGSRTLV_8844.fasta
 
-### Since we have to make some changes in the model.py. We cannot use the singularity image of the Jake. 
+### Since we have to make some changes in the model.py. We cannot use the singularity image.
 # I have used Kaliana lab to perform local alpha fold installation
 # https://github.com/kalininalab/alphafold_non_docker
 # cd /diazlab/data3/.abhinav/tools/miniconda3/envs/deepair/lib/python3.8/site-packages/ && patch -p0 < $alphafold_path/docker/openmm.patch
+
+### Please keep all the python version compatible other you will fall into the python dependency hell.
 # # $alphafold_path variable is set to the alphafold git repo directory (absolute path)
 # conda install -y -c conda-forge openmm==7.5.1 pdbfixer
 # conda install nvidia/label/cuda-12.4.1::cuda-toolkit --no-channel-priority
@@ -99,7 +101,6 @@ ${DBS}/AlphaFold.sif \
 # pip install --upgrade --no-cache-dir jax==0.4.11 jaxlib==0.4.11+cuda12.cudnn88 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 # pip install tensorflow[and-cuda]
 
-
 ### Test if GPU is being able to called by JAX and tensorflow
 import jax
 import jax.numpy as jnp
@@ -107,13 +108,14 @@ import jax.numpy as jnp
 # Check available devices
 devices = jax.devices()
 print("Available devices:", devices)
+# Available devices: [gpu(id=0)]
 
 # Create a matrix of ones and perform a simple operation
 x = jnp.ones((1000, 1000))  # Create a 1000x1000 matrix of ones
 y = jnp.dot(x, x)           # Matrix multiplication (dot product)
 
 # Print a small part of the result to confirm
-print("Result of matrix multiplication (partial):", y[:5, :5])  # Print top-left 5x5 block
+print("Result of matrix multiplication (partial):", y[:5, :5])  
 
 # cd /diazlab/data3/.abhinav/tools/miniconda3/envs/alphafold2/lib/python3.8/site-packages/ && patch -p0 < $alphafold_path/docker/openmm.patch
 
@@ -131,7 +133,7 @@ print("Result of matrix multiplication (partial):", y[:5, :5])  # Print top-left
 # module load python/3.8             # Load Python module (adjust if needed)
 
 # Activate your Conda environment
-source activate alphafold           # Use your specific Conda environment
+source activate alphafold2           # Use your specific Conda environment
 
 # Python script to test GPU functionality
 python - << EOF
@@ -150,11 +152,26 @@ y = jnp.dot(x, x)           # Matrix multiplication (dot product)
 print("Result of matrix multiplication (partial):", y[:5, :5])  # Print top-left 5x5 block
 EOF
 
+# bash run_alphafold.sh -d /diazlab/data3/abhinav/resource/alphafold_database/ \
+# -o /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/new_af/alphafold-2.3.1/output_af2_structure/ \
+# -f /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/DeepAIR/preprocessing_structure_feature/sampledata/fasta_2/QQYDSHLYT_9680.fasta \
+# -t 2020-05-16
+
+# bash run_alphafold.sh -d /diazlab/data3/abhinav/resource/alphafold_database/ \
+# -o /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/new_af/alphafold-2.3.1/output_af2_return_representation/ \
+# -f /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/DeepAIR/preprocessing_structure_feature/sampledata/fasta_2/VYGSGSPSNWFHP_460.fasta \
+# -t 2020-05-15
+
+# bash run_alphafold.sh -d /diazlab/data3/abhinav/resource/alphafold_database/ \
+# -o /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/new_af/alphafold-2.3.1/output_af2_return_representation/ \
+# -f /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/DeepAIR/preprocessing_structure_feature/sampledata/fasta_2/QQYDNWPPWT_460.fasta \
+# -t 2020-05-16
+
 # End of script
-### Running Step2
+# Running Step2
 DATA_DIR=/diazlab/data3/abhinav/resource/alphafold_database/   # Path to the directory containing the AlphaFold 2 downloaded data.
 FASTA_DIR=/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/DeepAIR/preprocessing_structure_feature/sampledata/fasta_2/ # Path to the directory containing the input FASTA files.
-OUTPUT_DIR=/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/DeepAIR/preprocessing_structure_feature/sampledata/ # Please replace YourPath with the exact path on your machine # Path to the directory where the results will be saved.
+OUTPUT_DIR=/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/DeepAIR/preprocessing_structure_feature/sampledata/ 
 
 for i in `ls $FASTA_DIR`; do
   echo $FASTA_DIR$i
@@ -173,10 +190,27 @@ for i in `ls $FASTA_DIR`; do
 #!/bin/bash
 #SBATCH --job-name=gpu_test_job    # Job name
 #SBATCH --gres=gpu:1               # Request 1 GPU
-#SBATCH --time=02:00:00            # Max runtime: 2 hrs (adjust if needed)
-#SBATCH --mem=50G                   # Memory request
+#SBATCH --time=07-00:00:00            # Max runtime: 2 hrs (adjust if needed)
+#SBATCH --mem=100G                   # Memory request
 #SBATCH --output=gpu_step2_output.log  # Output log file
 #SBATCH --error=gpu_step2_error.log  # Error log file
 
 bash step2_2.sh
 
+#### After completion of Step 2, we got the feature.pkl as well as the best model performance from af2
+## I have made some changes in the step3 since it is picking up the relaxed_model_ptm. In af2 I could not fina any model with ptm instead there is monomer ptm
+# so changed the name from result_model_1_ptm_pred_0.pkl to result_model_1_pred_0.pkl
+
+# python step3.py \
+# --AIR_file_path /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/DeepAIR/preprocessing_structure_feature/sampledata/QQYDNWPPWT_460_CDR3.csv \
+# --AF2_feature_folder /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/new_af/alphafold-2.3.1/output_af2_return_representation/ \
+# --output_folder /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/DeepAIR/preprocessing_structure_feature/sampledata/QQYDNWPPWT_460_output_feature
+
+### After generating the files lets run DeepAIR
+(2) For binding affinity prediciton (BAP) (Regression)
+python ./maincode/DeepAIR_BAP.py  \
+--input_data_file ../DeepAIR/DataSplit/test/BRP/A0301_KLGGALQAK_IE-1_CMV_binder_test.csv  \
+--result_folder ../DeepAIR/result_BAP/A0301_KLGGALQAK_IE-1_CMV  \
+--epitope A0301_KLGGALQAK_IE-1_CMV  \
+--AF2_feature_folder ../DeepAIR/DataSplit/structure_feature  \
+--transformer_model_folder ../DeepAIR/ProtTrans/prot_bert_bfd  \
