@@ -16,6 +16,7 @@
 ### Install pytorch
 # pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117
 
+# it is better to download the ProtTrans rather than using Pytorch
 import torch
 print(torch.__version__)  
 print(torch.cuda.is_available())  
@@ -209,8 +210,124 @@ bash step2_2.sh
 ### After generating the files lets run DeepAIR
 (2) For binding affinity prediciton (BAP) (Regression)
 python ./maincode/DeepAIR_BAP.py  \
---input_data_file ../DeepAIR/DataSplit/test/BRP/A0301_KLGGALQAK_IE-1_CMV_binder_test.csv  \
---result_folder ../DeepAIR/result_BAP/A0301_KLGGALQAK_IE-1_CMV  \
+--input_data_file /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/DeepAIR/sampledata/BAP/A0301_KLGGALQAK_IE-1_CMV_Reg.csv  \
+--result_folder /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/DeepAIR/sampledata/DeepAir_result \
 --epitope A0301_KLGGALQAK_IE-1_CMV  \
---AF2_feature_folder ../DeepAIR/DataSplit/structure_feature  \
---transformer_model_folder ../DeepAIR/ProtTrans/prot_bert_bfd  \
+--AF2_feature_folder /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/DeepAIR/sampledata/structure_feature/BAP/10X  \
+--transformer_model_folder /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/ProtTrans/prot_bert_bfd
+
+
+
+##### After Performing the test run on the tools data. Testing it on our EBV CD8 test data at this location
+# /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/data
+# while preparing the AIR file path we have kept the same header, as a default parameter 
+
+Step1
+conda activate DeepAIR
+python /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/DeepAIR/preprocessing_structure_feature/step1.py \
+    --AIR_file_path /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/data/CD8_Ag_test_CDR3.csv \
+    --output_table /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/data/CD8_Ag_test_CDR3Region.csv \
+    --output_fasta_folder /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/data/fasta/
+
+Step2: Running Alphafold
+conda activate alphafold2
+cd /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/new_af/alphafold-2.3.1/
+bash run_alphafold.sh \
+  -d /diazlab/data3/abhinav/resource/alphafold_database/ \
+    -o /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/data/af2_output_structure/ \
+      -f  /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/data/fasta/CVVNMGTLTF_1.fasta \
+        -t 2020-05-16
+
+
+### Running on the GPU 
+#!/bin/bash
+#SBATCH --job-name=gpu_test_job    # Job name
+#SBATCH --gres=gpu:1               # Request 1 GPU
+#SBATCH --time=02:00:00            # Max runtime: 2 hrs
+#SBATCH --mem=8G                   # Memory request
+#SBATCH --output=af2_CSASISGGDPYEQYF_output.log  # Output log file
+#SBATCH --error=af2_CSASISGGDPYEQYF_error.log  # Error log file
+
+# Activate your Conda environment
+source ~/.bashrc
+source /diazlab/data3/.abhinav/tools/miniconda3/etc/profile.d/conda.sh
+source activate alphafold2
+conda init
+conda activate alphafold2    
+
+cd /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/new_af/alphafold-2.3.1/
+bash run_alphafold.sh \
+  -d /diazlab/data3/abhinav/resource/alphafold_database/ \
+    -o /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/data/af2_output_structure/ \
+      -f  /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/data/fasta/CSASISGGDPYEQYF_1.fasta \
+        -t 2020-05-16
+
+# End of script
+# Running Step2
+source ~/.bashrc
+source /diazlab/data3/.abhinav/tools/miniconda3/etc/profile.d/conda.sh
+source activate alphafold2
+conda init
+conda activate alphafold2
+
+DATA_DIR=/diazlab/data3/abhinav/resource/alphafold_database/   # Path to the directory containing the AlphaFold 2 downloaded data.
+FASTA_DIR=/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/data/fasta/fasta2/ # Path to the directory containing the input FASTA files.
+OUTPUT_DIR=/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/data/af2_output_structure/ 
+
+cd /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/new_af/alphafold-2.3.1/
+for i in `ls $FASTA_DIR`; do
+  echo $FASTA_DIR$i
+   bash /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/alphafold-2.3.1/run_alphafold.sh \
+   -d /diazlab/data3/abhinav/resource/alphafold_database/ \
+    -o /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/data/af2_output_structure/ \
+    -f $FASTA_DIR$i \
+    -t 2023-05-16
+
+#### Running an test alphafold in slurm
+#!/bin/bash
+#SBATCH --job-name=gpu_test_job    # Job name
+#SBATCH --gres=gpu:1               # Request 1 GPU
+#SBATCH --time=07-00:00:00            # Max runtime: 2 hrs (adjust if needed)
+#SBATCH --mem=100G                   # Memory request
+#SBATCH --output=gpu_step2_output.log  # Output log file
+#SBATCH --error=gpu_step2_error.log  # Error log file
+
+bash step2_2.sh
+
+
+#!/bin/bash
+#SBATCH --job-name=test_multiple_job    # Job name
+#SBATCH --gres=gpu:1                    # Request 1 GPU
+#SBATCH --time=02:00:00                 # Max runtime: 2 hrs (adjust if needed)
+#SBATCH --mem=32G                        # Memory request
+#SBATCH --output=test_multiple_output_%A_%a.log  # Output log file
+#SBATCH --error=gpu_step2_error_%A_%a.log  # Error log file
+#SBATCH --array=0-$(($(ls $FASTA_DIR | wc -l) - 1))  # Array of jobs, one for each FASTA file
+
+source ~/.bashrc
+source /diazlab/data3/.abhinav/tools/miniconda3/etc/profile.d/conda.sh
+source activate alphafold2
+conda init
+conda activate alphafold2
+
+# Directories
+DATA_DIR=/diazlab/data3/abhinav/resource/alphafold_database/
+FASTA_DIR=/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/data/fasta/fasta2/
+OUTPUT_DIR=/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/data/af2_output_structure/
+
+# Get the list of FASTA files
+FASTA_FILES=($(ls $FASTA_DIR))
+
+# Select the FASTA file for this job
+FASTA_FILE=${FASTA_FILES[$SLURM_ARRAY_TASK_ID]}
+
+echo "Running for FASTA file: $FASTA_FILE"
+
+# Run the AlphaFold job for the selected FASTA file
+cd /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/alphafold-2.3.1/
+bash run_alphafold.sh \
+  -d $DATA_DIR \
+  -o $OUTPUT_DIR \
+  -f $FASTA_FILE \
+  -t 2023-05-16
+
