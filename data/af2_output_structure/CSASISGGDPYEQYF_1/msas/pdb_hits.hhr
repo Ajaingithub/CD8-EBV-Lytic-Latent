@@ -3,8 +3,8 @@ Match_columns 117
 No_of_seqs    118 out of 3057
 Neff          7.70723
 Searched_HMMs 80799
-Date          Fri Dec 20 11:20:10 2024
-Command       /diazlab/data3/.abhinav/tools/miniconda3/envs/alphafold2/bin/hhsearch -i /scratch/ajain/285058/tmpb0wqsse_/query.a3m -o /scratch/ajain/285058/tmpb0wqsse_/output.hhr -maxseq 1000000 -d /diazlab/data3/abhinav/resource/alphafold_database//pdb70/pdb70 
+Date          Fri Dec 20 15:36:34 2024
+Command       /diazlab/data3/.abhinav/tools/miniconda3/envs/alphafold2/bin/hhsearch -i /scratch/ajain/285226/tmp0px4dgkd/query.a3m -o /scratch/ajain/285226/tmp0px4dgkd/output.hhr -maxseq 1000000 -d /diazlab/data3/abhinav/resource/alphafold_database//pdb70/pdb70 
 
  No Hit                             Prob E-value P-value  Score    SS Cols Query HMM  Template HMM
   1 6QD6_C Uncharacterized protein  99.5 1.3E-17 1.6E-22  136.8   0.0  111    7-117   412-531 (542)
