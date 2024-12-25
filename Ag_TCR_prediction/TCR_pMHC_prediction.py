@@ -39,7 +39,7 @@ required_col = [col for col in df_cleaned.columns if col.endswith('_prob')]
 peptide = df_cleaned.loc[:,required_col]
 peptide_numeric = peptide.apply(pd.to_numeric, errors='coerce')
 peptide_numeric["Ag_range_10"] = df_cleaned["Ag_range_10"]
-peptide_numeric["Ag_range_10"] = df_cleaned["Ag_range_10"]
+peptide_numeric["max_Ag"] = df_cleaned["max_Ag"]
 
 
 TRA_TRB=df_cleaned.loc[:,['TRA1_CDR3','TRB1_CDR3']]
