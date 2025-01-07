@@ -6,3 +6,6 @@ model.*
 ProtTran*
 *.npy
 *.csv
+*.pdf
+*.txt
+*.RDS
