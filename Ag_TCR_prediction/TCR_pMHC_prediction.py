@@ -16,16 +16,16 @@ df_cleaned = df.dropna() ### Removed Nan
 print(df.shape, df_cleaned.shape)
 
 ### Separating out TRA and TRB based on --
-df_cleaned[["TRA_aa","TRB_aa"]] = df_cleaned['TRA1_TRA2_TRB1_TRB2_cdraa'].str.split('--', expand=True)
+df_cleaned.loc["TRA_aa","TRB_aa"] = df_cleaned['TRA1_TRA2_TRB1_TRB2_cdraa'].str.split('--', expand=True)
 
 ### Keeping only TRA1 and TRB1
-df_cleaned['TRA1_aa'] = df_cleaned['TRA_aa'].str.replace(r'-.*', '', regex=True) 
+df_cleaned['TRA1_aa'] = df_cleaned['TRA_aa'].str.replace(r'-.*', '', regex=True)
 df_cleaned['TRB1_aa'] = df_cleaned['TRB_aa'].str.replace(r'-.*', '', regex=True)
 
 ### Keeping only TRA1 and TRB1 CDR3
 # ^.*?_.*?_: This matches everything from the start of the string (^), followed by any characters up to the first underscore (.*?_),
 # then everything up to the second underscore (.*?_), and removes that part of the string.
-df_cleaned['TRA1_CDR3'] = df_cleaned['TRA1_aa'].str.replace(r'^.*?_.*?_', '', regex=True) 
+df_cleaned['TRA1_CDR3'] = df_cleaned['TRA1_aa'].str.replace(r'^.*?_.*?_', '', regex=True)
 df_cleaned['TRB1_CDR3'] = df_cleaned['TRB1_aa'].str.replace(r'^.*?_.*?_', '', regex=True)
 
 # Identify columns starting with 'EBV' or 'VZV'
@@ -101,8 +101,31 @@ TRA1_CDR3_encoded = one_hot_encode_multiple_sequences(df["TRA1_CDR3"])
 TRB1_CDR3_encoded = one_hot_encode_multiple_sequences(df["TRB1_CDR3"])
 TRA1_TRB1_combined = np.concatenate((TRA1_CDR3_encoded, TRB1_CDR3_encoded), axis=1)
 
+
+# Since random forest cannot work on the 3D array so we have flatten it
+# Flatten the 3D array into 2D for Random Forest
+num_sequences, max_sequence_length, num_amino_acids = TRA1_TRB1_combined.shape
+TRA1_TRB1_combined_flattened = TRA1_TRB1_combined.reshape(num_sequences, -1)
+
+# Check the shape after flattening
+print(TRA1_TRB1_combined_flattened.shape)  # Should be (num_sequences, max_sequence_length * num_amino_acids)
+
+# Step 6: Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(
+    TRA1_TRB1_combined_flattened, df['max_Ag_encoded'], test_size=0.2, random_state=42
+)
+
+print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
+
+# Step 7: Train the Random Forest classifier
+clf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+clf_model.fit(X_train, y_train)
+
+# Step 8: Make predictions
+y_pred = clf_model.predict(X_test)
+
 # Check the shape of the resulting array
-print(TRA1_TRB1_combined.shape)  
+print(TRA1_TRB1_combined.shape)
 
 # Step 6: Split the data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(TRA1_TRB1_combined, df['max_Ag_encoded'], test_size=0.2, random_state=42)
@@ -121,7 +144,7 @@ np.save('TRA1_CDR3_encoded.npy', TRA1_CDR3_encoded)
 np.save('TRB1_CDR3_encoded.npy', TRB1_CDR3_encoded)
 df['max_Ag_encoded'].to_csv('max_Ag_encoded.csv', index=False)
 
-### RUnning it on GPU gpudev1
+### Running it on GPU gpudev1
 # conda activate alphafold2
 # Define LSTM model
 import os
@@ -168,7 +191,6 @@ y_pred = (y_pred > 0.5).astype(int)
 print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
 # Accuracy: 0.002237970906378217
 
-
 ####### CNN
 # Define CNN model
 import numpy as np
@@ -196,3 +218,14 @@ y_pred = (y_pred > 0.5).astype(int)  # Convert probabilities to binary labels
 
 # Evaluate accuracy
 print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
+
+#### Extracting for VDJdb
+ls *.tsv | sed 's/_/\t/g' | awk '{print "grep -w TRA "$1"_"$2"_"$3"_"$4" | cut -f3 | awk \x27{print $0\"\\t"$1"_"$2"\"}\x27 > "$1"_"$2"_TRA_CDR3.tsv &"}' > TRA_CDR3_extract.sh
+ls *.tsv | sed 's/_/\t/g' | awk '{print "grep -w TRB "$1"_"$2"_"$3"_"$4" | cut -f3 | awk \x27{print $0\"\\t"$1"_"$2"\"}\x27 > "$1"_"$2"_TRB_CDR3.tsv &"}' > TRB_CDR3_extract.sh
+
+# [ajain@c4-dev1 IEDB]$ grep -w alpha EBV_BMLF1_GLCTLVAML_IEDB.tsv | grep -w "beta" | wc -l
+# 400
+# [ajain@c4-dev1 IEDB]$ grep -w alpha EBV_BMLF1_GLCTLVAML_IEDB.tsv | grep -wv "beta" | wc -l
+# 7993
+# [ajain@c4-dev1 IEDB]$ grep -wv alpha EBV_BMLF1_GLCTLVAML_IEDB.tsv | grep -w "beta" | wc -l
+# 11104

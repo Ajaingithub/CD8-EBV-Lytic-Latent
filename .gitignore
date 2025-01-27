@@ -1,5 +1,7 @@
 model.*
 *.pkl
+revision/*
+*/data/*
 *.pdb
 *.log
 *.err

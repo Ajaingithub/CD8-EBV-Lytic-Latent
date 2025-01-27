@@ -373,4 +373,3 @@ bash run_alphafold.sh \
   -o $OUTPUT_DIR \
   -f $FASTA_FILE \
   -t 2023-05-16
-

@@ -6,12 +6,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.preprocessing import LabelEncoder
 
-# Step 1: Load the Data
+### TRA1 CDR3 from our CD8 T cell dataset
 sequences_file = 'TRA1_CDR3.txt'  # Path to the sequences file
 sequences_df = pd.read_csv(sequences_file, header=None, names=['ID', 'Sequence'], delimiter='\t')
 sequences_df = sequences_df.dropna(subset=['Sequence'])
-#label_encoder = LabelEncoder()
-#sequences_df['Encoded_Sequence'] = label_encoder.fit_transform(sequences_df['Sequence'])
+# label_encoder = LabelEncoder()
+# sequences_df['Encoded_Sequence'] = label_encoder.fit_transform(sequences_df['Sequence'])
 
 def one_hot_encode(sequence):
     # Define the alphabet of amino acids
