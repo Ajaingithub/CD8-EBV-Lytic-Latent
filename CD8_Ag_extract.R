@@ -247,6 +247,107 @@ pdf(paste0("/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/
 h
 dev.off()
 
+#### Performing pseudobulk differential for each clones
+savedir <- "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/"
+clone_files <- list.files("/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/clone_sharing_table_aa/", pattern = "clone_table_aa")
+
+for(i in 1:length(clone_files)){
+    try({
+        clones_common <- read.table(paste0(savedir,"Table/clone_sharing_table_aa/",clone_files[i]), header = TRUE, sep = "\t")
+        CD8_Ag_RNA_clones <- subset(CD8_Ag_RNA,cells = rownames(clones_common))
+        CD8_Ag_RNA_clones <- NormalizeData(CD8_Ag_RNA_clones)
+        samplenames <- unique(CD8_Ag_RNA_clones@meta.data$samplename)
+        markers <- FindMarkers(CD8_Ag_RNA_clones, ident.1 = samplenames[1], ident.2 = samplenames[2], group.by = "samplename")
+        write.table(markers, paste0(savedir,"Table/clone_sharing_table_aa/scdiff/",samplenames[1],"_vs_",samplenames[2],"_",clone_files[i]),
+        sep = "\t", row.names = T, col.names = T, quote = F)
+    })
+}
+
+
+# Load required library
+
+for(i in 1:length(clone_files)){
+    library(edgeR)
+    clones_common <- read.table(paste0(savedir,"Table/clone_sharing_table_aa/",clone_files[i]), header = TRUE, sep = "\t")
+    CD8_Ag_RNA_clones <- subset(CD8_Ag,cells = rownames(clones_common))
+    Treg_cts <- AggregateExpression(CD8_Ag_RNA_clones, group.by = "samplename", assays = 'RNA', slot = "counts", return.seurat = FALSE)
+    Treg_cts_2 <- as.data.frame(Treg_cts$RNA)
+    colnames(Treg_cts_2) <- gsub("-","_",colnames(Treg_cts_2))
+    
+    ### Both the samples should have at least some value
+    Treg_cts_3 <- Treg_cts_2[Treg_cts_2[,1] > 0 & Treg_cts_2[,2] > 0,]
+    # Normalize data using CPM (Counts Per Million)
+    dge <- DGEList(counts = Treg_cts_3)
+    cpm_data <- cpm(dge, log = TRUE)  # Log2-transformed CPM 
+    cpm_data_df <- as.data.frame(cpm_data)
+    cpm_data_df$logFC <- log2(cpm_data_df[,1] / cpm_data_df[,2])
+    cpm_data_df_order <- cpm_data_df[order(-cpm_data_df$logFC),]
+    deg <- cpm_data_df_order[abs(cpm_data_df_order$logFC) > 0.5, ]
+    write.table(deg, paste0(savedir,"Table/clone_sharing_table_aa/pseudobulk/",colnames(deg)[1],"_vs_",colnames(deg)[2],"_",clone_files[i]),
+                sep = "\t", row.names = T, col.names = T, quote = F)
+}
+
+### Now we have identified significant genes we can perform the herarical clustering for all the samples
+### Now making a heatmap for all the clones
+rm(clones)
+clones <- list()
+for(i in 1:length(clone_files)){
+    clones[[i]] <- rownames(read.table(paste0(savedir,"Table/clone_sharing_table_aa/",clone_files[i]), header = TRUE, sep = "\t"))
+}
+
+extract_cells <- unlist(clones)
+CD8_Ag_extracted = subset(CD8_Ag, cells = extract_cells)
+Treg_cts <- AggregateExpression(CD8_Ag_extracted, group.by = "samplename", assays = 'RNA', slot = "counts", return.seurat = FALSE)
+Treg_cts_2 <- as.data.frame(Treg_cts$RNA)
+colnames(Treg_cts_2) <- gsub("-","_",colnames(Treg_cts_2))
+diff_genes <- read.table("/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/clone_sharing_table_aa/pseudobulk/differential_genes.txt", header = FALSE)[,1]
+Treg_cts_3 <- Treg_cts_2[match(diff_genes,rownames(Treg_cts_2), nomatch=0),]
+
+dge <- DGEList(counts = Treg_cts_3)
+cpm_data <- cpm(dge, log = TRUE)  # Log2-transformed CPM 
+
+metadata <- as.data.frame(colnames(cpm_data))
+colnames(metadata) <- "orig_ident"
+
+split_to_dataframe <- function(x) {
+  split_elements <- strsplit(x, "_")[[1]]
+  data.frame(t(split_elements))
+}
+
+# Convert split elements to dataframe
+sample_split <- do.call(rbind, lapply(metadata$orig_ident, split_to_dataframe))
+colnames(sample_split) <- c("sampleID","Ag","Age","Age","Gender","Exp")
+metadata2 <- cbind(metadata, sample_split)
+
+library(ComplexHeatmap)
+library(circlize)
+column_anno <- HeatmapAnnotation(
+    Age = metadata2$Age,
+    Gender = metadata2$Gender,
+    col = list(
+        Age = c("Y" = "#8fa0ed", "O" = "#e19292"),
+        Gender = c("F" = "#09a941", "M" = "#af0000")
+    )
+)
+
+cpm_data_scaled <- t(scale(t(cpm_data)))
+# rld_gene_scaled_ordered <- rld_gene_scaled[match(tot_genes, rownames(rld_gene_scaled)), ]
+h <- Heatmap(cpm_data_scaled,
+    name = "Z-score", # title of legend
+    column_title = "Differential genes", row_title = "Samples",
+    row_names_gp = gpar(fontsize = 12), # Text size for row names
+    column_names_gp = gpar(fontsize = 8),
+    col = colorRamp2(c(-3, 0, 3), c("blue", "white", "red")),
+    cluster_columns = TRUE,
+    cluster_rows = TRUE,
+    top_annotation = column_anno
+)
+
+pdf(paste("/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/clone_sharing_table_aa/pseudobulk/heatmap_differential_genes.pdf", sep = ""), height = 7, width = 6)
+print(h)
+dev.off()
+
+
 
 #### Checking epitopes of VDJdb matching with our epitopes
 # VDJdb
@@ -430,16 +531,27 @@ TRAV_samples <- read.table(paste0(savedir, "v_gene_usage/TRAV_samples_unique_clo
 Ag <- gsub(".*._EBV_|.*._VZV_","",colnames(TRAV_samples)) %>% unique()
 req_Ag <- grep("BALF4$|IE63$",Ag, invert = T, value = T)
 # TRAV_samples_req <- TRAV_samples[grep("BALF4$|IE63$", colnames(TRAV_samples), invert = T, value = F),]
+### Old and Young
+req_Ag_Y = paste0("Y_",req_Ag)
+req_Ag_O = paste0("O_",req_Ag)
+total_Ag <- c(req_Ag_Y, req_Ag_O)
 
-TRAV_samples_Y <- TRAV_samples[,grep("^O",colnames(TRAV_samples))]
-
-combined_TRAV <- as.data.frame(matrix(, nrow = nrow(TRAV_samples), ncol = length(req_Ag)))
+# TRAV_samples_Y <- TRAV_samples[,grep("^O",colnames(TRAV_samples))]
+combined_TRAV <- as.data.frame(matrix(, nrow = nrow(TRAV_samples), ncol = length(total_Ag)))
 rownames(combined_TRAV) <- rownames(TRAV_samples)
-colnames(combined_TRAV) <- req_Ag
+colnames(combined_TRAV) <- total_Ag
 
 #### Combining all the samples into one for each V gene
 for(i in 1:length(req_Ag)){
-    combined_TRAV[,req_Ag[i]] <- rowSums(TRAV_samples_Y[,grep(req_Ag[i], colnames(TRAV_samples_Y))]) %>% as.vector()
+    TRAV_samples_subset <- TRAV_samples[,grep(req_Ag[i], colnames(TRAV_samples))]
+    
+    ### Performing for old
+    TRAV_samples_subset_O <- TRAV_samples_subset[,grep(paste0("^O"),colnames(TRAV_samples_subset))]
+    combined_TRAV[,paste0("O_",req_Ag[i])] = rowSums(TRAV_samples_subset_O)
+    
+    ### Performing for young
+    TRAV_samples_subset_Y <- TRAV_samples_subset[,grep(paste0("^Y"),colnames(TRAV_samples_subset))]
+    combined_TRAV[,paste0("Y_",req_Ag[i])] = rowSums(TRAV_samples_subset_Y)
 }
 
 # TRAV_samples_norm_logged= log1p(TRAV_samples_norm)
@@ -448,25 +560,27 @@ pca_result <- prcomp(combined_TRAV, scale. = TRUE)
 
 library(ggalt)
 library(ggplot2)
+library(ggrepel)
 pca_df <- data.frame(pca_result$rotation)
-pca_df$Ag <- gsub(".*._EBV_|.*._VZV_", "", rownames(pca_df))
+pca_df$Ag <- gsub("Y_|O_", "", rownames(pca_df))
+pca_df$Age <- gsub("_.*.|_.*.", "", rownames(pca_df))
 
-p <- ggplot(pca_df, aes(PC1, PC2, color = Ag, fill = Ag)) +
+p <- ggplot(pca_df, aes(PC1, PC2, color = Ag, fill = Ag, shape = Age)) +
     geom_point(stroke = 2) + 
     # geom_encircle(expand=0, alpha=0.1) +
-    geom_text(aes(label = Ag)) +
+    geom_text_repel(aes(label = Ag)) +
         xlab(paste0("PC1: ",round(pca_result$sdev[1],2),"% variance")) +
     ylab(paste0("PC2: ",round(pca_result$sdev[2],2),"% variance")) +
     scale_fill_manual(values=c("yellow", "limegreen","steelblue1","red3","lightcoral","orange","slateblue","azure1","beige","cadetblue3")) +
     # scale_color_manual(values=c("yellow3", "green4","steelblue3","red4","coral4","orange3","slateblue4","azure1","beige","cadetblue3")) +
     theme_minimal() +
-    ggtitle("TRAV old gene usage individual combined")
+    ggtitle("TRAV individual combined")
 
-pdf(paste0(paste0(savedir, "v_gene_usage/TRAV_old_sample_clone_unique_ind_combined.pdf")))
+pdf(paste0(paste0(savedir, "v_gene_usage/TRAV_clone_unique_ind_combined_Age_withlabels.pdf")))
 p
 dev.off()
 
-write.table(pca_df, paste0(savedir, "v_gene_usage/TRAV_old_sample_clone_unique_ind_combined.txt"), sep = "\t", quote = F, row.names = T, col.names = T)
+write.table(pca_df, paste0(savedir, "v_gene_usage/TRAV_clone_unique_ind_combined_Age.txt"), sep = "\t", quote = F, row.names = T, col.names = T)
 
 
 # grep("--TRBV", CD8_Ag_VDJC_sample_Ag_noNA$TRA1_TRA2_TRB1_TRB2_vdjc, value = TRUE) %>%
@@ -558,7 +672,6 @@ dev.off()
 
 write.table(pca_df, paste0(savedir, "v_gene_usage/TRBV_sample_clone_unique_ind_combined.txt"), sep = "\t", quote = F, row.names = T, col.names = T)
 
-
 #### Planning to perform by combining all the samples and removing the BALF4 and IE63
 TRAV_samples <- read.table(paste0(savedir, "v_gene_usage/TRBV_samples_unique_clones.txt"), header = T)
 Ag <- gsub(".*._EBV_|.*._VZV_","",colnames(TRAV_samples)) %>% unique()
@@ -644,7 +757,61 @@ dev.off()
 
 write.table(pca_df, paste0(savedir, "v_gene_usage/TRBV_old_sample_clone_unique_ind_combined.txt"), sep = "\t", quote = F, row.names = T, col.names = T)
 
+#### Old and Young
+TRAV_samples <- read.table(paste0(savedir, "v_gene_usage/TRBV_samples_unique_clones.txt"), header = T)
+Ag <- gsub(".*._EBV_|.*._VZV_","",colnames(TRAV_samples)) %>% unique()
+req_Ag <- grep("BALF4$|IE63$",Ag, invert = T, value = T)
+# TRAV_samples_req <- TRAV_samples[grep("BALF4$|IE63$", colnames(TRAV_samples), invert = T, value = F),]
+### Old and Young
+req_Ag_Y = paste0("Y_",req_Ag)
+req_Ag_O = paste0("O_",req_Ag)
+total_Ag <- c(req_Ag_Y, req_Ag_O)
 
+# TRAV_samples_Y <- TRAV_samples[,grep("^O",colnames(TRAV_samples))]
+combined_TRAV <- as.data.frame(matrix(, nrow = nrow(TRAV_samples), ncol = length(total_Ag)))
+rownames(combined_TRAV) <- rownames(TRAV_samples)
+colnames(combined_TRAV) <- total_Ag
+
+#### Combining all the samples into one for each V gene
+for(i in 1:length(req_Ag)){
+    TRAV_samples_subset <- TRAV_samples[,grep(req_Ag[i], colnames(TRAV_samples))]
+    
+    ### Performing for old
+    TRAV_samples_subset_O <- TRAV_samples_subset[,grep(paste0("^O"),colnames(TRAV_samples_subset))]
+    combined_TRAV[,paste0("O_",req_Ag[i])] = rowSums(TRAV_samples_subset_O)
+    
+    ### Performing for young
+    TRAV_samples_subset_Y <- TRAV_samples_subset[,grep(paste0("^Y"),colnames(TRAV_samples_subset))]
+    combined_TRAV[,paste0("Y_",req_Ag[i])] = rowSums(TRAV_samples_subset_Y)
+}
+
+# TRAV_samples_norm_logged= log1p(TRAV_samples_norm)
+library(stats)
+pca_result <- prcomp(combined_TRAV, scale. = TRUE)
+
+library(ggalt)
+library(ggplot2)
+library(ggrepel)
+pca_df <- data.frame(pca_result$rotation)
+pca_df$Ag <- gsub("Y_|O_", "", rownames(pca_df))
+pca_df$Age <- gsub("_.*.|_.*.", "", rownames(pca_df))
+
+p <- ggplot(pca_df, aes(PC1, PC2, color = Ag, fill = Ag, shape = Age)) +
+    geom_point(stroke = 2) + 
+    # geom_encircle(expand=0, alpha=0.1) +
+    geom_text_repel(aes(label = Ag)) +
+        xlab(paste0("PC1: ",round(pca_result$sdev[1],2),"% variance")) +
+    ylab(paste0("PC2: ",round(pca_result$sdev[2],2),"% variance")) +
+    scale_fill_manual(values=c("yellow", "limegreen","steelblue1","red3","lightcoral","orange","slateblue","azure1","beige","cadetblue3")) +
+    # scale_color_manual(values=c("yellow3", "green4","steelblue3","red4","coral4","orange3","slateblue4","azure1","beige","cadetblue3")) +
+    theme_minimal() +
+    ggtitle("TRBV individual combined")
+
+pdf(paste0(paste0(savedir, "v_gene_usage/TRBV_clone_unique_ind_combined_Age_withlabels.pdf")))
+p
+dev.off()
+
+write.table(pca_df, paste0(savedir, "v_gene_usage/TRBV_clone_unique_ind_combined_Age.txt"), sep = "\t", quote = F, row.names = T, col.names = T)
 
 #### Performing the k-mer motif sequence analysis
 # 1. Position Frequency Matrix (PFM)
@@ -1168,7 +1335,6 @@ dev.off()
 innate_Ucell <- CD8_Ag@meta.data[,c("innate","CDR3")]
 write.table(innate_Ucell, "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/innate_Ucell.txt", col.names = T, row.names = T, sep = "\t", quote = F)
 
-
 DefaultAssay(CD8_Ag) <- "RNA"
 rm(markers)
 markers <- list()
@@ -1184,3 +1350,41 @@ dev.off()
 innate_Ucell <- CD8_Ag@meta.data[,c("innate","innate_RNA")]
 colnames(innate_Ucell) <- c("innate_imputed","innate_unimputed")
 write.table(innate_Ucell, "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/innate_Ucell_imputed_unimputed.txt", col.names = T, row.names = T, sep = "\t", quote = F)
+
+# TRSS redo: could you run this analysis again to make sure we have the correct data? please use all clones (defined as nucleotide CDR1+2+3 TRA1, A2, B1) using only 
+# memory cells and only expanded cells, combining all clones of an Ag in Y vs O (not individual specific) , the make TRSS across cell types (TEMRA, CM, EM1, …)
+library(Seurat)
+library(dplyr)
+
+CD8_metadata <- CD8_Ag@meta.data[!is.na(CD8_Ag@meta.data$TRA1_or_TRA2_TRB1_no_TRB2),] #### removing empty cells
+CD8_metadata2 <- CD8_metadata[grep("naïve",CD8_metadata$celltypes,invert=TRUE),] #### removing the naive cells
+CD8_metadata3 <- CD8_metadata2[grep(",",CD8_metadata2$Ag_range_10,invert=TRUE),] ### removing TCR cross presentation
+
+CD8_metadata3$Ag <- gsub(".*._","",CD8_metadata3$Ag_range_10)
+Ag = unique(CD8_metadata3$Ag)
+CD8_metadata3$Age_Ag <- paste0(CD8_metadata3$Age,"_", CD8_metadata3$Ag)
+AgeAg <- unique(CD8_metadata3$Age_Ag)
+
+req_cells <- rownames(CD8_metadata3)
+CD8_Ag_req = subset(CD8_Ag, cells = req_cells)
+
+stopifnot(all(rownames(CD8_metadata3) == rownames(CD8_Ag_req@meta.data)))
+CD8_Ag_req@meta.data <- CD8_metadata3
+
+#### Cell types
+savedir = "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/TCR/"
+dir.create(savedir, showWarnings = FALSE)
+source("/diazlab/data3/.abhinav/resources/all_scripts/R/VZV_clonal_sharing_gt_1_celltypes.R")
+CD8_Ag_req$Age_Ag <- paste(CD8_Ag_req@meta.data$Age ,CD8_Ag_req@meta.data$Ag, sep="_")
+Age_Ag = grep(",",unique(CD8_Ag_req$Age_Ag),value=TRUE,invert=TRUE)
+clus_length = length(unique(CD8_Ag_req@meta.data$celltypes))
+clus_factor = c("CM","EM1","EM2","EM3","TEMRA","MAIT","HELIOS_high")
+
+for (i in 1:length(Age_Ag)) {
+  try({TCR_AJ_VZV_gt_1_CT(object = CD8_Ag_req, savedir = savedir, 
+                          clus_col = "celltypes", TCR_col = "TRA1_or_TRA2_TRB1_no_TRB2", 
+                          group_col = "Age_Ag", group_val = Age_Ag[i], 
+                          split_col = "orig.ident", column_name = c("id","Ag","Age","Age_number","gender","Run"),
+                          total_clusters = clus_length, clus_fact = clus_factor)
+  })
+}
