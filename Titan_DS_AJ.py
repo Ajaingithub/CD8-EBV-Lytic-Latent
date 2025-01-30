@@ -55,7 +55,6 @@ test_tcrs = test_tcr.loc[test_data['sequence_id']]['data']
 train_labels = train_data['label']
 test_labels = test_data['label']
 
-
 ### Running KNN
 # predictions, knn_labels = knn(
 #     train_epitopes,
@@ -104,15 +103,33 @@ for epitope, tcr in zip(test_epitopes, test_tcrs):
 
 # Transformers Attention 
 ## Directly running
-# python3 ../scripts/flexible_training.py \
-# data/train_small.csv \
-# data/test_small.csv  \
-# data/tcr_full.csv \
-# data/epitopes.smi \
-# trained_model \
-# data/params_small.json \
-# tutorial_setting \
-# bimodal_mca
+### I have made the changes in the scripts/flexible_traning.py
+# In line 187 and 188 change the test loader change 
+# shuffle = False,  drop_last=False respectively
+# Then you can directly run from the command line or run each line for better understanding of the training
+
+python3 ../scripts/flexible_training.py \
+data/train_small.csv \
+data/test_small.csv  \
+data/tcr_full.csv \
+data/epitopes.smi \
+trained_model2 \
+data/params_small.json \
+tutorial_setting \
+bimodal_mca
+
+### Same changes here also
+### Finetuning an existing TITAN model
+python3 ../scripts/semifrozen_finetuning.py \
+data/train_small.csv \
+data/test_small.csv  \
+data/tcr_full.csv \
+data/epitopes.smi \
+trained_model3/tutorial_setting/ \
+trained_finetune_model3 \
+tutorial_setting_finetune \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/params/params_finetuning.json \
+bimodal_mca
 
 # Import packages
 import os
@@ -183,12 +200,14 @@ model_path = os.path.join('/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/
 # applies convolutional layers for feature extraction, focuses on important regions via attention, and combines the extracted features using dense layers. The 
 # regularization (dropout) and batch size are tuned for efficient training.
 ### Model Parameters
-{"augment_smiles": false, "smiles_canonical": false, "ligand_start_stop_token": true, "receptor_start_stop_token": true, "ligand_padding_length": 422, 
- "receptor_padding_length": 130, "receptor_embedding": "learned", "ligand_embedding": "learned", "predefined_embedding": "blosum", "receptor_embedding_size": 26, 
- "ligand_embedding_size": 26, "ligand_filters": [26, 26], "receptor_filters": [26, 26], "ligand_kernel_sizes": [[5, 26], [7, 26]], "receptor_kernel_sizes": [[3, 26], 
+
+{"augment_smiles": false, "smiles_canonical": false, "ligand_start_stop_token": true, "receptor_start_stop_token": true, "ligand_padding_length": 422,
+ "receptor_padding_length": 130, "receptor_embedding": "learned", "ligand_embedding": "learned", "predefined_embedding": "blosum", "receptor_embedding_size": 26,
+ "ligand_embedding_size": 26, "ligand_filters": [26, 26], "receptor_filters": [26, 26], "ligand_kernel_sizes": [[5, 26], [7, 26]], "receptor_kernel_sizes": [[3, 26],
  [5, 26]], "ligand_attention_size": 32, "receptor_attention_size": 32, "dense_hidden_sizes": [200, 80], "activation_fn": "relu", "dropout": 0.5, "batch_norm": false, 
- "batch_size": 512, "lr": 0.0001, "epochs": 100, "save_model": 20, "ligand_vocabulary_size": 575, "receptor_vocabulary_size": 33, "ligand_as": "smiles", 
+ "batch_size": 512, "lr": 0.0001, "epochs": 100, "save_model": 20, "ligand_vocabulary_size": 575, "receptor_vocabulary_size": 33, "ligand_as": "smiles",
  "number_of_parameters": 418369}
+
 # receptor_embedding: "learned"`
 # The receptor's input (e.g., a protein sequence) is converted into embeddings that are learned during training. This means the model will optimize these embeddings 
 # as part of its parameters.
@@ -205,6 +224,9 @@ model_path = os.path.join('/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/
 #     Example: A -> [0.1, 0.3, ..., -0.2] (26 values).
 #     ligand_embedding_size: 26
 #     Each ligand token (e.g., a SMILES character) is represented similarly as a 26-dimensional vector.
+# Biological Considerations
+#  There are 20 standard amino acids and a few rare/modified ones, so a dimensionality of 26 may be capturing essential biochemical properties (e.g., charge, hydrophobicity, size, etc.).
+#  Some models use an embedding size slightly larger than 20 to allow extra room for learned feature representations.
 
 # 3. Convolutional Filters
 # These define the number of filters (feature maps) and filter sizes (kernel sizes) used in convolutional layers for feature extraction from ligands and receptors.
@@ -221,12 +243,194 @@ model_path = os.path.join('/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/
 #         The first layer uses a 3x26 kernel.
 #         The second layer uses a 5x26 kernel.
 
+# Parameter	Meaning
+# ligand_filters: [26, 26]	Two CNN layers, each with 26 feature detectors (filters) for ligand (epitope).
+# receptor_filters: [26, 26]	Two CNN layers, each with 26 filters for receptor (TCR).
+# ligand_kernel_sizes: [[5, 26], [7, 26]]	First layer: 5 amino acids wide filter, second layer: 7 amino acids wide.
+# receptor_kernel_sizes: [[3, 26], [5, 26]]	First layer: 3 amino acids wide, second layer: 5 amino acids wide.
+# Each step extracts patterns from a small window (5-mers or 7-mers) while considering all 26 embedding dimensions.
+
 # 4. Attention Parameters
 # These control the attention mechanisms, which allow the model to focus on the most relevant parts of the ligand or receptor sequence:
 #     ligand_attention_size: 32
 #     The size of the attention layer for ligands. This defines the attention weight vector's dimension.
 #     receptor_attention_size: 32
 #     The size of the attention layer for receptors.
+
+# So there is a embedding size of 26 for each amino acid in the TCR / epitope. Each embedding captures the amino acid characteristic/features like polar, non-polar,
+# structure etc. For these 26 embedding it has 2 convolution layer with different kernel size to identify at 5-mer or 7-mer local interaction / motifs.
+# Then comes the multi head attention with 32 dimensions that also captures features for each amino acid. 
+
+# But I thought it was already captures in the 26 embedding size. Can you please explain this?
+# Embedding (26-Dimensional Representation)
+
+# ChatGPT
+# Each amino acid in the TCR or epitope is converted into a 26-dimensional vector. This embedding captures intrinsic properties of amino acids, such as:
+#     Polarity (polar vs. nonpolar)
+#     Charge (positive, negative, neutral)
+#     Hydrophobicity
+#     Structural tendencies (α-helix, β-sheet, loop formation)
+#     Other biochemical features
+
+# At this stage, each amino acid is treated independently. There is no notion of sequential relationships (like motifs or interactions) yet.
+# 2️⃣ Convolutional Layers (Capturing Local Features)
+
+# The 2 convolutional layers act as pattern detectors:
+
+#     Filters: Each convolution filter learns a specific pattern (e.g., certain motifs in the sequence).
+#     Kernel size: Determines how many amino acids are considered together.
+#         A 5-mer filter detects short local motifs.
+#         A 7-mer filter captures longer-range dependencies.
+
+# After convolution, you now have a richer representation of the sequence, where local interactions between amino acids are considered.
+# 3️⃣ Attention Mechanism (Contextualizing Features)
+
+# Now comes the multi-head attention layer with 32 dimensions. You might wonder:
+# 👉 Why do we need attention if embeddings already capture features?
+
+# Here's why:
+
+#     Embeddings capture static properties, but they don't tell us how an amino acid interacts with others in the sequence.
+#     Convolutions capture local motifs, but they can't model long-range dependencies across the sequence.
+#     Attention captures global dependencies by allowing each amino acid to "look" at the entire sequence and weigh important residues.
+
+# The 32-dimensional attention acts as an interaction-aware representation. It refines the initial embeddings and convolution outputs by:
+
+#     Assigning importance weights to amino acids.
+#     Enabling context-aware understanding (which amino acids are critical for TCR-epitope binding).
+#     Allowing dynamic feature extraction (rather than fixed local motifs).
+
+# 🔑 Why is Attention 32-Dimensional Instead of 26?
+
+# The embedding was 26-dimensional, but the attention mechanism learns a new feature space to better capture interactions.
+
+#     The extra 6 dimensions (from 26 → 32) allow more flexibility in modeling contextual relationships.
+#     Think of it as expanding the feature space to better capture interaction-specific characteristics.
+
+# Attention size = 32 means the model learns 32 different attention heads (or features) to focus on different aspects of the ligand (epitope).
+# Each attention head captures different biochemical properties of the sequence.
+# Instead of using a single score per position, the model learns 32-dimensional attention weights.
+
+# If attention size = 32, it means:
+#     Each position generates 32 different attention scores.
+#     These 32 different views are used to focus on different biological properties (like hydrophobicity, charge interactions, etc.).
+#     The model combines these attention scores to make a final decision.
+
+# So 26D will capture each amino acid either for TCR or epitope idenpendetly. While 32D will be context aware and tried to find the attention or important amino acid 
+# that would have interaction between TCR and epitope. So in this context aware it is not very specific to the TCR only or epitope but can work with both TCR and epitope 
+# together. Am I correct?
+
+# Yes, you’ve got it almost perfectly, but let’s refine it just a little bit!
+# 1️⃣ 26D Embedding – Independent Amino Acid Representation
+
+#     Each amino acid in TCR or epitope is independently mapped to a 26-dimensional vector.
+#     This embedding does not consider sequence context or interactions—each amino acid is treated in isolation.
+#     If you only had embeddings, you'd only know the chemical properties of each amino acid, but not how they interact.
+
+# 2️⃣ 32D Attention – Context-Aware & Interaction-Sensitive Representation
+
+#     This learns which amino acids are important based on the entire sequence, meaning:
+#         It assigns higher attention scores to amino acids that are important for interaction.
+#         It captures dependencies between distant residues that convolution alone can't model.
+#     The attention mechanism can work across both TCR and epitope.
+#         It doesn't just focus on TCR or epitope separately.
+#         It learns which TCR residues are important for binding to which epitope residues.
+#         This means the attention scores can highlight cross-sequence relationships.
+
+# So there are 2 dense layer 200 and 80
+# First dense layer:
+#     Takes the input features and transforms them into a 200-dimensional representation.
+# Second dense layer:
+#     Takes the 200D representation and compresses it into 80 dimensions.
+# After these dense layers, the output is passed into the final classification layer (usually a single neuron with a sigmoid activation for binary classification).
+#  Final Understanding
+#     200D layer: Expands the feature space for learning more complex interactions.
+#     80D layer: Reduces the feature space, making the model more efficient before output.
+#     These layers help refine the learned information before making the final prediction.
+
+# Network Architecture Parameters:
+#     "activation_fn": "relu"
+#         Specifies the activation function used in the model.
+#         "relu" (Rectified Linear Unit) is a popular activation function because it helps avoid the vanishing gradient problem.
+#         Formula: ReLU(x) = max(0, x), meaning negative values become zero, while positive values remain unchanged.
+#         Helps the model learn complex patterns while maintaining computational efficiency.
+
+#     "dropout": 0.5
+#         A regularization technique to prevent overfitting.
+#         During training, 50% (0.5) of neurons in a layer are randomly dropped (deactivated) in each iteration to encourage robustness.
+#         Ensures that the model does not rely too much on specific neurons and generalizes better.
+
+#     "batch_norm": false
+#         Batch Normalization (BN) normalizes the activations in a layer to speed up training and improve stability.
+#         "false" means BN is not applied, so the model does not normalize activations after each layer.
+#         If enabled (true), BN would scale and shift neuron outputs based on the batch statistics.
+# Training Parameters:
+#     "batch_size": 512
+#         Specifies the number of samples the model processes in one training step.
+#         A batch size of 512 means that during each forward and backward pass, 512 training samples are processed together before updating weights.
+#         Larger batch sizes provide more stable updates but require more memory.
+#     "lr": 0.0001 (Learning Rate)
+#         Controls how much the model updates weights during training.
+#         "0.0001" is a small learning rate, meaning gradual weight updates to ensure stable convergence and avoid overshooting the optimal solution.
+#         If too high, the model may oscillate and fail to converge; if too low, training may be too slow.
+#     "epochs": 100
+#         Defines the number of times the model sees the entire dataset during training.
+#         "100" means the model will go through the dataset 100 times, updating its weights after each pass.
+#         More epochs allow the model to learn more, but excessive epochs can lead to overfitting.
+
+# Vocabulary Size Parameters:
+
+#     "ligand_vocabulary_size": 575
+#         This defines the number of unique tokens (characters or substructures) that represent ligands (epitopes) in the dataset.
+#         Since "ligand_as": "smiles", the ligands are represented using SMILES (Simplified Molecular Input Line Entry System) notation.
+#         The model tokenizes the SMILES strings into 575 possible unique tokens to encode molecular structures efficiently.
+
+#     "receptor_vocabulary_size": 33
+#         Similar to ligands, this defines the vocabulary size for receptors (TCRs).
+#         The receptor sequences are likely encoded as amino acid sequences with a vocabulary of 33 unique tokens (including 20 standard amino acids + special tokens like padding, unknown, etc.).
+#         This means the receptor model can recognize and process up to 33 different sequence tokens.
+
+# "ligand_as": "smiles"
+
+#     This specifies how ligands (epitopes) are represented in the model.
+#     "smiles" means the ligands are described using SMILES notation, which is commonly used in cheminformatics to encode molecular structures as text.
+#     Example of a SMILES string for glucose: C(C1C(C(C(O1)O)O)O)O.
+
+# "number_of_parameters": 418369
+
+#     This is the total number of trainable parameters in the model.
+#     It includes all weights, biases, embedding layers, convolution filters, and dense layers that are being optimized during training.
+#     More parameters generally mean a more powerful model, but too many can lead to overfitting and require more computational resources.
+
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+
+# Epitope sequence and attention scores
+epitope = list("YLKHKATV")
+attention_scores = [0.2, 0.5, 0.8, 0.9, 0.6, 0.3, 0.7, 0.4]
+
+# Create a heatmap
+plt.figure(figsize=(8, 2))
+ax = sns.heatmap(
+    [attention_scores],
+    cmap="Reds",
+    cbar=True,
+    linewidths=0.5,
+    xticklabels=np.arange(1, len(epitope) + 1),
+    yticklabels=["Epitope"],
+    annot=False  # Disable automatic annotation
+)
+
+# Manually add amino acid labels
+for i in range(len(epitope)):
+    ax.text(i + 0.5, 0.5, epitope[i], ha="center", va="center", color="black")
+
+# Labels and title
+plt.title("Attention Weights for Epitope Sequence")
+plt.xlabel("Amino Acid Position")
+plt.show()
+plt.savefig("/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/tutorial/attention_head.pdf")
 
 # 5. Dense Layers
 # These parameters define the dense (fully connected) layers that combine features extracted from ligands and receptors:
@@ -578,7 +782,6 @@ for i in range(len(tcr_id)):
                 token = protein_language.index_to_token[x]
             t.append(token)
     tokens.append(t)
-
 
 import matplotlib.pyplot as plt
 import numpy as np
