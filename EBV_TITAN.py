@@ -1,35 +1,56 @@
-#!/usr/bin/env python3
-### I have made the changes in the scripts/flexible_traning.py
-# In line 187 and 188 change the test loader change for .csv
-# as well in line 301 and 302 change the test loader change for .smi
-# shuffle = False,  drop_last=False respectively
-# Then you can directly run from the command line or run each line for better understanding of the training
+#### Running a TITAN for our constructed EBV dataset
 
-### CHanges made
-
-
-python3 ../scripts/flexible_training.py \
-data/train_small.csv \
-data/test_small.csv  \
-data/tcr_full.csv \
-data/epitopes.smi \
-trained_model3 \
-data/params_small.json \
-tutorial_setting \
+python3 /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/scripts/flexible_training.py \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/Ag_TCR_prediction/data/TITAN/Ag_train.csv \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/Ag_TCR_prediction/data/TITAN/Ag_test.csv  \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/Ag_TCR_prediction/data/TITAN/tcr.csv \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/Ag_TCR_prediction/data/TITAN/epitope.smi \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/Ag_TCR_prediction/trained_model \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/tutorial/data/params_small.json \
+All_Ag \
 bimodal_mca
 
-### Finetuning an existing TITAN model
-python3 ../scripts/semifrozen_finetuning.py \
-data/train_small.csv \
-data/test_small.csv  \
-data/tcr_full.csv \
-data/epitopes.smi \
-trained_model3/tutorial_setting/ \
-trained_finetune_model3 \
-tutorial_setting_finetune \
-/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/params/params_finetuning.json \
-bimodal_mca
+# INFO:VZV_IE62:	 **** TRAINING ****   Epoch [50/100], loss: 0.00086. This took 6.5 secs.
+# INFO:VZV_IE62:	 **** TESTING **** Epoch [50/100], loss: 0.00011, ROC-AUC: 1.000, Average precision: 1.000.
+# INFO:VZV_IE62:	 New best performance in "loss" with value : 0.0001058 in epoch: 49
+# INFO:VZV_IE62:== Epoch [50/100] ==
 
+# python3 /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/scripts/flexible_training.py \
+# /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/datasets/trained_model_train.csv \
+# /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/datasets/trained_model_test.csv \
+# /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/datasets/tcr.csv \
+# /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/datasets/epitopes.smi \
+# trained_model \
+# /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/tutorial/data/params_small.json \
+# full_dataset \
+# bimodal_mca
+
+
+python3 /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/scripts/flexible_model_eval.py \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/Ag_TCR_prediction/data/TITAN/Ag_train.csv \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/Ag_TCR_prediction/data/TITAN/tcr.csv \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/Ag_TCR_prediction/data/TITAN/epitope.smi \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/trained_model/full_dataset \
+bimodal_mca \
+Ag_evaluate
+
+python3 /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/scripts/flexible_model_eval.py \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/datasets/trained_model_test.csv \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/datasets/tcr.csv \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/datasets/epitopes.smi \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/trained_model/full_dataset \
+bimodal_mca \
+tool_test_eval
+
+python3 /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/scripts/flexible_model_eval.py \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/Ag_TCR_prediction/data/TITAN/shuffled_test.txt \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/datasets/tcr.csv \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/datasets/epitopes.smi \
+/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/trained_model/full_dataset \
+bimodal_mca \
+tool_test_eval
+
+#### EBV TITAN training
 ### This will remove all the variables except some buildins
 for var in list(globals().keys()):
     if var not in ["__builtins__", "__file__", "__name__", "__doc__", "__package__"]:
@@ -63,14 +84,14 @@ torch.manual_seed(123456)
 # setup logging
 logging.basicConfig(stream=sys.stdout)
 
-data_dir = "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/tutorial/"
-train_affinity_filepath = os.path.join(data_dir, "data/train_small.csv")
-test_affinity_filepath = os.path.join(data_dir, "data/test_small.csv")
-receptor_filepath = os.path.join(data_dir, "data/tcr_full.csv")
-ligand_filepath = os.path.join(data_dir, "data/epitopes.smi")
-model_path = os.path.join(data_dir, "trained_model2")
-params_filepath = os.path.join(data_dir, "data/params_small.json")
-training_name = "tutorial_setting"
+data_dir = "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/Ag_TCR_prediction/data/TITAN/"
+train_affinity_filepath = os.path.join(data_dir, "train.csv")
+test_affinity_filepath = os.path.join(data_dir, "test.csv")
+receptor_filepath = os.path.join(data_dir, "tcr.csv")
+ligand_filepath = os.path.join(data_dir, "epitope.smi")
+model_path = os.path.join(data_dir, "EBV_trained_model")
+params_filepath = os.path.join("/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/TITAN/tutorial/data/params_small.json")
+training_name = "EBV_CDR3"
 model_type = "bimodal_mca"
 
 # yapf: enable
