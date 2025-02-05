@@ -216,8 +216,6 @@ python ./maincode/DeepAIR_BAP.py  \
 --AF2_feature_folder /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/DeepAIR/sampledata/structure_feature/BAP/10X  \
 --transformer_model_folder /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/ProtTrans/prot_bert_bfd
 
-
-
 ##### After Performing the test run on the tools data. Testing it on our EBV CD8 test data at this location
 # /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/data
 # while preparing the AIR file path we have kept the same header, as a default parameter 

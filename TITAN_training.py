@@ -7,7 +7,6 @@
 
 ### CHanges made
 
-
 python3 ../scripts/flexible_training.py \
 data/train_small.csv \
 data/test_small.csv  \

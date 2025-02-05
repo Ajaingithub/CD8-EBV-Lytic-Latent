@@ -1,4 +1,6 @@
 trained_mode*
+*cache*
+log*
 model.*
 *.pkl
 revision/*
