@@ -36,7 +36,7 @@ os.chdir("./EPACT/")
 tool_path = "/diazlab/data3/.abhinav/tools/EPACT"
 config_path = os.path.join(tool_path,"configs/config-pretrain-epitope-lm.yml")
 config = load_config(config_path)
-    
+
 if not os.path.exists(config.training.log_dir):
     os.makedirs(config.training.log_dir)
 
@@ -54,13 +54,22 @@ print(torch.version.cuda)  # Check CUDA version used by PyTorch
 print(torch.backends.cudnn.version())  # Check cuDNN version
 
 if config.task == 'epitope-lm':
-    dataset = EpitopeDataset(os.path.join(tool_path,config.data.data_path))
+    dataset = EpitopeDataset(os.path.join(tool_path,config.data.data_path)) #### This will load the dataset
     train_size = int(0.8 * len(dataset))  # 80% for training
     val_size = int(0.1 * len(dataset))    # 10% for validation
     test_size = len(dataset) - train_size - val_size  # Remaining for testing
     # Perform random split
     train_data, val_data, test_data = random_split(dataset, [train_size, val_size, test_size])
-    batch_converter = EpitopeBatchConverter(max_epitope_len=config.data.max_epi_len, use_atchley_factor=True)
+    batch_converter = EpitopeBatchConverter(max_epitope_len=config.data.max_epi_len, use_atchley_factor=True) 
+    # Batch convert with the tokenized into tensor for pytorch
+    # Masked IUPAC Token with padding 
+    # Unmasked IUPAC Token with padding
+    # Atchley factor 
+
+    # /diazlab/data3/.abhinav/tools/EPACT/EPACT/dataset/batch_converter.py
+    # /diazlab/data3/.abhinav/tools/EPACT/EPACT/utils/encoding.py
+    # /diazlab/data3/.abhinav/tools/EPACT/EPACT/utils/tokenizer.py
+    
     Trainer = EpitopeLMTrainer(config)
     
 elif config.task == 'cdr3-lm':
