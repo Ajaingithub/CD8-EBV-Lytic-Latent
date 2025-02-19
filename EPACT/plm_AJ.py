@@ -88,3 +88,6 @@ def train(model, dataloader, epochs=10):
         print(f"Epoch {epoch + 1}, Loss: {total_loss:.4f}")
 
 train(model, dataloader)
+
+# while on the c4-n38 and c4-n39 it is NVIDIA A100 80GB PCIe MIG 1g.10gb i.e. it is divided into 7 10GB MIGs. While the head node GPU node NVIDIA RTX A4000 use the full
+# memory to run which is much faster. We cannot use 2 instances at a time which makes it very slow. So the admin has to provide the entire GPU to train for a time being. 

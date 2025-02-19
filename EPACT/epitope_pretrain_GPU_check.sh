@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=epitope_train    # Job name
-#SBATCH --gres=gpu:4               # Request 1 GPU
+#SBATCH --gres=gpu:1g.10gb:4              # Request 1 GPU
 #SBATCH --time=10:00:00            # Max runtime: 10 hrs
 #SBATCH --mem=32G                   # Memory request
-#SBATCH --output=epitope_train_2.log  # Output log file
-#SBATCH --error=epitope_train_2.log  # Error log file
+#SBATCH --output=epitope_train_GPUcheck.log  # Output log file
+#SBATCH --error=epitope_train_GPUcheck.log  # Error log file
 
 # Activate your Conda environment
 source ~/.bashrc
@@ -15,7 +15,7 @@ conda activate EPACT_env2
 
 cd /diazlab/data3/.abhinav/tools/EPACT/
 # pretrain epitope masked language model.
-python scripts/pretrain/pretrain_plm.py --config configs/config-pretrain-epitope-lm.yml
+python scripts/pretrain/pretrain_plm.py --config configs/config-pretrain-epitope-lm_2workers.yml
 
 # pretrain paired cdr3 masked language model.
 # python scripts/pretrain/pretrain_plm.py --config configs/config-pretrain-cdr3-lm.yml
