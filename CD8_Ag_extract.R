@@ -2,7 +2,7 @@
 #### Extracting out the TCR and Ag extraction for uploading to the VDJ database. So creating TCR alpha amino acid, TCR beta amino acid
 library(Seurat)
 library(dplyr)
-# CD8_Ag <- readRDS("/diazlab/data3/.abhinav/.immune/cancer_combined/project/resources/GSE275633_CD8_Antigen_BEAM_T.RDS")
+CD8_Ag <- readRDS("/diazlab/data3/.abhinav/.immune/cancer_combined/project/resources/GSE275633_CD8_Antigen_BEAM_T.RDS")
 CD8_required <- CD8_Ag@meta.data[, c("TRA1_TRA2_TRB1_TRB2_cdraa", "TRA1_TRA2_TRB1_TRB2_vdjc", "Ag_range_10")]
 CD8_required_noNA <- na.omit(CD8_required)
 # unique_clones <- unique(CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_cdraa)
@@ -346,8 +346,6 @@ h <- Heatmap(cpm_data_scaled,
 pdf(paste("/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/clone_sharing_table_aa/pseudobulk/heatmap_differential_genes.pdf", sep = ""), height = 7, width = 6)
 print(h)
 dev.off()
-
-
 
 #### Checking epitopes of VDJdb matching with our epitopes
 # VDJdb
@@ -1351,6 +1349,44 @@ innate_Ucell <- CD8_Ag@meta.data[,c("innate","innate_RNA")]
 colnames(innate_Ucell) <- c("innate_imputed","innate_unimputed")
 write.table(innate_Ucell, "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/innate_Ucell_imputed_unimputed.txt", col.names = T, row.names = T, sep = "\t", quote = F)
 
+##### Performing UCell for the Adaptive genes that Ines has provided
+library(ArchR)
+library(UCell)
+library(ggplot2)
+# source("/research/labs/immunology/goronzy_weyand/GoronzyLab_Mayo/Abhinav/Resources/scCITESeq/pipeline_functions/express_cell_front.R")
+DefaultAssay(CD8_Ag) <- "MAGIC_RNA"
+rm(markers)
+markers <- list()
+markers[["adaptive"]] <- read.table("/diazlab/data3/.abhinav/resources/gene_list/adaptiveness.txt", header = FALSE, sep= "\t")[,1] %>% unique() %>% toupper()
+CD8_Ag <- AddModuleScore(CD8_Ag, features = markers, slot="data")
+colnames(CD8_Ag@meta.data)[grep("Cluster",colnames(CD8_Ag@meta.data))] <- "adaptive"
+p <- FeaturePlot(CD8_Ag, features = "adaptive", reduction = "wnn.umap") + scale_color_gradientn(colors = ArchRPalettes$solarExtra, , limits = c(0, 1))
+
+pdf("/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/featureplot/adaptive_genes_MAGIC_RNA_1.pdf", width =5.5, height = 5.5)
+p
+dev.off()
+
+adaptive_Ucell <- CD8_Ag@meta.data[,c("adaptive","CDR3")]
+write.table(adaptive_Ucell, "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/adaptive_Ucell.txt", col.names = T, row.names = T, sep = "\t", quote = F)
+
+DefaultAssay(CD8_Ag) <- "RNA"
+rm(markers)
+markers <- list()
+markers[["adaptive"]] <- read.table("/diazlab/data3/.abhinav/resources/gene_list/adaptiveness.txt", header = FALSE, sep= "\t")[,1] %>% unique() %>% toupper()
+CD8_Ag <- AddModuleScore(CD8_Ag, features = markers, slot="data")
+colnames(CD8_Ag@meta.data)[grep("Cluster",colnames(CD8_Ag@meta.data))] <- "adaptive_RNA"
+p <- FeaturePlot(CD8_Ag, features = "adaptive_RNA", reduction = "wnn.umap") + scale_color_gradientn(colors = ArchRPalettes$solarExtra, limits = c(0, 1))
+
+pdf("/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/featureplot/adaptive_genes_RNA_1.pdf", width =5.5, height = 5.5)
+p
+dev.off()
+
+adaptive_Ucell <- CD8_Ag@meta.data[,c("adaptive","adaptive_RNA")]
+colnames(adaptive_Ucell) <- c("adaptive_imputed","adaptive_unimputed")
+write.table(adaptive_Ucell, "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/adaptive_Ucell_imputed_unimputed.txt", col.names = T, row.names = T, sep = "\t", quote = F)
+
+
+
 # TRSS redo: could you run this analysis again to make sure we have the correct data? please use all clones (defined as nucleotide CDR1+2+3 TRA1, A2, B1) using only 
 # memory cells and only expanded cells, combining all clones of an Ag in Y vs O (not individual specific) , the make TRSS across cell types (TEMRA, CM, EM1, …)
 library(Seurat)
@@ -1388,3 +1424,286 @@ for (i in 1:length(Age_Ag)) {
                           total_clusters = clus_length, clus_fact = clus_factor)
   })
 }
+
+#### Generating the input data for EPACT
+library(Seurat)
+library(dplyr)
+# CD8_Ag <- readRDS("/diazlab/data3/.abhinav/.immune/cancer_combined/project/resources/GSE275633_CD8_Antigen_BEAM_T.RDS")
+### We can predict the TCR-pMHC specificity score as well as contact score 
+### CDR3.alpha.aa,CDR3.beta.aa,Epitope.peptide,MHC,V.alpha,J.alpha,V.beta,J.beta,CDR1.alpha.aa,CDR2.alpha.aa,CDR1.beta.aa,CDR2.beta.aa,Target
+CD8_required <- CD8_Ag@meta.data[c("TRA1_TRA2_TRB1_TRB2_cdraa","Ag_range_10","TRA1_TRA2_TRB1_TRB2_vdjc")]
+CD8_required_noNA <- CD8_required[!is.na(CD8_required$TRA1_TRA2_TRB1_TRB2_cdraa),]
+
+### To extract out CDR1,2, and 3 from alpha and beta 
+CD8_required_noNA_2 <- CD8_required_noNA[grep("NA-NA",CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_cdraa,value=FALSE, invert=TRUE),]
+
+split_to_dataframe <- function(x) {
+      split_elements <- strsplit(x, "_")[[1]]
+      data.frame(t(split_elements))
+    }
+    
+# Convert split elements to dataframe
+alpha_CDR3 <- do.call(rbind, lapply(gsub("-.*.", "", CD8_required_noNA_2$TRA1_TRA2_TRB1_TRB2_cdraa), split_to_dataframe))
+CD8_required_noNA_2$CDR1.alpha.aa <- alpha_CDR3$X1
+CD8_required_noNA_2$CDR2.alpha.aa <- alpha_CDR3$X2
+CD8_required_noNA_2$CDR3.alpha.aa <- alpha_CDR3$X3
+
+beta_CDR3 <- do.call(rbind, lapply(gsub(".*.--", "", CD8_required_noNA_2$TRA1_TRA2_TRB1_TRB2_cdraa) %>% gsub("-.*.", "", .), split_to_dataframe))
+CD8_required_noNA_2$CDR1.beta.aa <- beta_CDR3$X1
+CD8_required_noNA_2$CDR2.beta.aa <- beta_CDR3$X2
+CD8_required_noNA_2$CDR3.beta.aa <- beta_CDR3$X3
+
+### Extracting out Alpha CDR3 amino acids and V and J alpha
+# CD8_required_noNA$cdr3.alpha <- gsub("-.*.", "", CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_cdraa) %>%
+#     gsub("*.*_", "", .)
+# CD8_required_noNA$cdr1.alpha <- gsub("-.*.", "", CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_cdraa) %>%
+#     gsub("_.*.","",.)
+# CD8_required_noNA$cdr2.alpha <- gsub("-.*.", "", CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_cdraa) %>%
+#     gsub("_C.*.","",.)
+
+CD8_required_noNA_2$v.alpha <- gsub("-[A-Z].*.", "", CD8_required_noNA_2$TRA1_TRA2_TRB1_TRB2_vdjc) %>%
+    gsub("__.*.", "", .)
+CD8_required_noNA_2$j.alpha <- gsub("-[A-Z].*.", "", CD8_required_noNA_2$TRA1_TRA2_TRB1_TRB2_vdjc) %>%
+    gsub(".*.__", "", .) %>%
+    gsub("_TRAC", "", .)
+
+# Beta CDR3 amino acid, V, D, J
+# CD8_required_noNA$cdr3.beta <- gsub(".*.--", "", CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_cdraa) %>%
+#     gsub("-.*.", "", .) %>%
+#     gsub(".*._", "", .)
+CD8_required_noNA_2$v.beta <- gsub(".*.--", "", CD8_required_noNA_2$TRA1_TRA2_TRB1_TRB2_vdjc) %>%
+    gsub("_.*.", "", .)
+CD8_required_noNA_2$d.beta <- gsub(".*.--", "", CD8_required_noNA_2$TRA1_TRA2_TRB1_TRB2_vdjc) %>%
+    gsub("_TRBJ.*.", "", .) %>%
+    gsub("*.*_", "", .) %>%
+    gsub("NA-NA", "", .)
+CD8_required_noNA_2$j.beta <- gsub(".*.--", "", CD8_required_noNA_2$TRA1_TRA2_TRB1_TRB2_vdjc) %>%
+    gsub("_TRBC[1-2]*.*", "", .) %>%
+    gsub(".*._", "", .)
+
+CD8_required_noNA_2_spec <- CD8_required_noNA_2[grep(",",CD8_required_noNA_2$Ag_range_10,value=FALSE, invert=TRUE),]
+
+MHC = "HLA-A*02:01"
+CD8_required_noNA_2_spec$Antigen <- gsub("VZV_|EBV_","",CD8_required_noNA_2_spec$Ag_range_10)
+
+Ag_seq <- read.table("/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/Ag_name_sequence.txt", header = TRUE)
+
+library(stringr)
+patterns <- Ag_seq$Ag_name
+replacements <- Ag_seq$Ag_seq
+CD8_required_noNA_2_spec$Ag_seq <- CD8_required_noNA_2_spec$Antigen
+
+for (i in seq_along(patterns)) {
+    pattern <- paste0("\\b", patterns[i], "\\b")
+    CD8_required_noNA_2_spec$Ag_seq <- str_replace_all(CD8_required_noNA_2_spec$Ag_seq, pattern, replacements[i])
+}
+
+### Making EPACT df
+column_req <- c("CDR3.alpha.aa","CDR3.beta.aa","Epitope.peptide","MHC",
+                "V.alpha","J.alpha","V.beta","J.beta","CDR1.alpha.aa",
+                "CDR2.alpha.aa","CDR1.beta.aa","CDR2.beta.aa","Target")
+Epact_mat <- matrix(ncol = length(column_req), nrow = nrow(CD8_required_noNA_2_spec))
+Epact_df <- as.data.frame(Epact_mat)
+colnames(Epact_df) <- column_req
+
+#### Filing up this dataframe
+Epact_df[,"CDR3.alpha.aa"] <- CD8_required_noNA_2_spec[,"CDR3.alpha.aa"]
+Epact_df[,"CDR2.alpha.aa"] <- CD8_required_noNA_2_spec[,"CDR2.alpha.aa"]
+Epact_df[,"CDR1.alpha.aa"] <- CD8_required_noNA_2_spec[,"CDR1.alpha.aa"]
+Epact_df[,"CDR3.beta.aa"] <- CD8_required_noNA_2_spec[,"CDR3.beta.aa"]
+Epact_df[,"CDR2.beta.aa"] <- CD8_required_noNA_2_spec[,"CDR2.beta.aa"]
+Epact_df[,"CDR1.beta.aa"] <- CD8_required_noNA_2_spec[,"CDR1.beta.aa"]
+
+## V and J alpha
+Epact_df[,"V.alpha"] <- CD8_required_noNA_2_spec[,"v.alpha"]
+Epact_df[,"J.alpha"] <- CD8_required_noNA_2_spec[,"j.alpha"]
+Epact_df[,"V.beta"] <- CD8_required_noNA_2_spec[,"v.beta"]
+Epact_df[,"J.beta"] <- CD8_required_noNA_2_spec[,"j.beta"]
+
+Epact_df[,"Epitope.peptide"] <- CD8_required_noNA_2_spec[,"Ag_seq"]
+Epact_df[,"MHC"] = "HLA-A*02:01"
+Epact_df[,"Target"] = 1
+
+write.table(Epact_df, "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/data/CD8_EBV_Epact_TCR_full.csv", quote = F, row.names = F, col.names = T, sep = ",")
+
+#  [1] "TRA1_TRA2_TRB1_TRB2_cdraa" "Ag_range_10"
+#  [3] "TRA1_TRA2_TRB1_TRB2_vdjc"  "CDR1.alpha.aa"
+#  [5] "CDR2.alpha.aa"             "CDR3.alpha.aa"
+#  [7] "CDR1.beta.aa"              "CDR2.beta.aa"
+#  [9] "CDR3.beta.aa"              "v.alpha"
+# [11] "j.alpha"                   "v.beta"
+# [13] "d.beta"                    "j.beta"
+# [15] "Antigen"                   "Ag_seq"
+
+#### Running the prediction using EPACT
+cd /diazlab/data3/.abhinav/tools/EPACT/
+python /diazlab/data3/.abhinav/tools/EPACT/scripts/predict/predict_tcr_pmhc_binding.py \
+    --config /diazlab/data3/.abhinav/tools/EPACT/configs/config-paired-cdr123-pmhc-binding.yml \
+    --input_data_path /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/data/CD8_EBV_Epact_TCR_full.csv \
+    --model_location /diazlab/data3/.abhinav/tools/EPACT/checkpoints/paired-cdr123-pmhc-binding/paired-cdr123-pmhc-binding-model-all.pt \
+    --log_dir /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/results/preds-cdr123-pmhc-binding/CD8_EBV_all/
+
+
+## For Ranks
+rank_colname <- c("clonotype_id","CDR3.alpha.aa","CDR3.beta.aa",
+"V.alpha","J.alpha","V.beta","J.beta","epitope","Epitope.peptide",
+"CDR1.alpha.aa","CDR2.alpha.aa","CDR1.beta.aa","CDR2.beta.aa","MHC")
+
+Epact_rankdf <- Epact_df
+Epact_rankdf$clonotype_id <- rownames(Epact_rankdf)
+Epact_rankdf[,"epitope"] <- CD8_required_noNA_2_spec[,"Antigen"]
+
+match(colnames(Epact_rankdf),rank_colname) ## all matched
+Epact_rankdf_order <- Epact_rankdf[,rank_colname]
+stopifnot(colnames(Epact_rankdf_order) == rank_colname)
+
+write.table(Epact_rankdf_order, "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/data/CD8_EBV_Epact_TCR_full_rank.csv", 
+quote = F, row.names = F, col.names = T, sep = ",")
+# predict binding ranks for SARS-CoV-2 responsive TCR clonotypes
+cd /diazlab/data3/.abhinav/tools/EPACT/
+python scripts/predict/predict_tcr_pmhc_binding_rank.py --config configs/config-paired-cdr123-pmhc-binding.yml \
+                                        --log_dir /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/CD8_EBV_ranking_Antigen_2/ \
+                                        --input_data_path /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/data/all_TCR_pMHC/CD8_EBV_Epact_TCR_full_rank.csv \
+                                        --model_location checkpoints/paired-cdr123-pmhc-binding/paired-cdr123-pmhc-binding-model-all.pt \
+                                        --bg_tcr_path data/pretrained/10x-paired-healthy-human-tcr-repertoire.csv \
+                                        --num_bg_tcrs 20000
+
+
+# predict distance matrices and contact sites between MEL8 TCR and HLA-A2-presented peptides.
+interact_col <- c("Epitope.peptide","MHC","CDR3.alpha.aa","CDR3.beta.aa","CDR1.alpha.aa","CDR2.alpha.aa","CDR1.beta.aa","CDR2.beta.aa")
+Epact_interact <- Epact_rankdf[,interact_col]
+write.table(Epact_interact, "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/data/CD8_EBV_Epact_TCR_interact.csv", 
+quote = F, row.names = F, col.names = T, sep = ",")
+
+cd /diazlab/data3/.abhinav/tools/EPACT/
+for i in {1..5}
+do
+    python scripts/predict/predict_tcr_pmhc_interact.py --config configs/config-paired-cdr123-pmhc-interact.yml \
+        --input_data_path /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/data/CD8_EBV_Epact_TCR_interact.csv \
+        --model_location checkpoints/paired-cdr123-pmhc-interaction/paired-cdr123-pmhc-interaction-model-all.pt \
+        --log_dir /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/results/interaction-CD8-EBV-bg-cdr123-closest_all/
+done
+
+### converting all the CDR3 sequence to 25
+# bash
+# cut -d "," -f3 CD8_EBV_Epact_TCR_interact.csv | while read word; do
+#   len=$(echo -n "$word" | awk '{print length}')
+#   echo "Word: $word, Length $len"  >> CDR3_alpha_sequence_size.txt # Debugging line to see what's happening
+# done
+
+# cut -d "," -f4 CD8_EBV_Epact_TCR_interact.csv | while read word; do
+#   len=$(echo -n "$word" | awk '{print length}')
+#   echo "Word: $word, Length $len"  >> CDR3_beta_sequence_size.txt # Debugging line to see what's happening
+# done
+
+# grep -v "CAEDNNARLMFGDGTQLVVKPRSARGFFVMPINMVYNFNKFYF" CD8_EBV_Epact_TCR_interact.csv > CD8_EBV_Epact_TCR_interact_remove_morethan25.csv
+## (head -1 CD8_EBV_Epact_TCR_full_rank.csv && cat /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/data/unique_TCR_pMHC/CD8_EBV_Epact_TCR_full_rank_unique_noheader_2.csv) > /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/data/unique_TCR_pMHC/CD8_EBV_Epact_TCR_full_rank_unique_wid_header.csv
+cd /diazlab/data3/.abhinav/tools/EPACT
+python scripts/predict/predict_tcr_pmhc_interact.py --config configs/config-paired-cdr123-pmhc-interact.yml \
+--input_data_path /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/data/CD8_EBV_Epact_TCR_interact_remove_morethan25.csv \
+--model_location checkpoints/paired-cdr123-pmhc-interaction/paired-cdr123-pmhc-interaction-model-all.pt \
+--log_dir /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/results/interaction-CD8-EBV-bg-cdr123-closest_all/
+
+#### Running without the duplicate values
+# cd /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/data/unique_TCR_pMHC/
+## Since full rank provide the same output as 
+cd /diazlab/data3/.abhinav/tools/EPACT/
+python scripts/predict/predict_tcr_pmhc_binding_rank.py --config configs/config-paired-cdr123-pmhc-binding.yml \
+                                        --log_dir /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/CD8_EBV_ranking_Antigen_unique/ \
+                                        --input_data_path /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/data/unique_TCR_pMHC/CD8_EBV_Epact_TCR_full_rank_unique_wid_header.csv \
+                                        --model_location checkpoints/paired-cdr123-pmhc-binding/paired-cdr123-pmhc-binding-model-all.pt \
+                                        --bg_tcr_path data/pretrained/10x-paired-healthy-human-tcr-repertoire.csv \
+                                        --num_bg_tcrs 20000
+
+
+cd /diazlab/data3/.abhinav/tools/EPACT
+python scripts/predict/predict_tcr_pmhc_interact.py --config configs/config-paired-cdr123-pmhc-interact.yml \
+--input_data_path /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/data/unique_TCR_pMHC/CD8_EBV_Epact_TCR_interact_remove_morethan25_unique_wid_header_clonotypeid_correct.csv \
+--model_location checkpoints/paired-cdr123-pmhc-interaction/paired-cdr123-pmhc-interaction-model-all.pt \
+--log_dir /diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/results/interaction-CD8-EBV-bg-cdr123-closest_all_unique/
+
+#### Performing the adaptive and innate score median for ANOVA test
+## ines provided a list for Ag specific and cell types specifc
+
+library(dplyr)
+Ag_cell <- read.table("/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/Ines_Ag_innate_adaptive_filtered_cells.txt", header = TRUE, sep = "\t")
+Ag_cell$individuals_Ag <- paste(gsub("_.*.","",Ag_cell$individuals), Ag_cell$Ag, sep = "_")
+
+# Calculate median and quartiles per Antigen (Ag)
+summary_stats <- Ag_cell %>%
+  group_by(individuals_Ag) %>%
+  summarise(
+    innate_median = median(innate_unimputed),
+    innate_Q1 = quantile(innate_unimputed, 0.25),
+    innate_Q3 = quantile(innate_unimputed, 0.75),
+    adaptive_median = median(adaptive_unimputed),
+    adaptive_Q1 = quantile(adaptive_unimputed, 0.25),
+    adaptive_Q3 = quantile(adaptive_unimputed, 0.75)
+  )
+
+# Print results
+print(summary_stats)
+write.table(summary_stats, "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/Ag_innate_adaptive_median_quartile_summary.txt", sep = "\t", quote = F, row.names = F, col.names = T)
+
+sample_freq <- as.data.frame(table(Ag_cell$individuals_Ag))
+req_samples <- sample_freq[sample_freq$Freq > 10,"Var1"]
+Ag_cell_req <- Ag_cell[grep(paste(req_samples, collapse = "|"), Ag_cell$individuals_Ag),] 
+
+# Calculate median and quartiles per Antigen (Ag)
+summary_stats <- Ag_cell_req %>%
+  group_by(individuals_Ag) %>%
+  summarise(
+    innate_median = median(innate_unimputed),
+    innate_Q1 = quantile(innate_unimputed, 0.25),
+    innate_Q3 = quantile(innate_unimputed, 0.75),
+    adaptive_median = median(adaptive_unimputed),
+    adaptive_Q1 = quantile(adaptive_unimputed, 0.25),
+    adaptive_Q3 = quantile(adaptive_unimputed, 0.75)
+  )
+
+# Print results
+print(summary_stats)
+write.table(summary_stats, "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/Ag_sample_ls_10_remve_innate_adaptive_median_quartile_summary.txt", sep = "\t", quote = F, row.names = F, col.names = T)
+
+#### Celltypes
+library(dplyr)
+Ind_cell <- read.table("/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/Ines_celltype_innate_adaptive_filtered_cells.txt", header = TRUE, sep = "\t")
+Ind_cell$individuals_celltype <- paste(gsub("_.*.","",Ind_cell$individuals), Ind_cell$celltypes, sep = "_")
+
+# Calculate median and quartiles per Antigen (Ag)
+summary_stats <- Ind_cell %>%
+  group_by(individuals_celltype) %>%
+  summarise(
+    innate_median = median(innate_unimputed),
+    innate_Q1 = quantile(innate_unimputed, 0.25),
+    innate_Q3 = quantile(innate_unimputed, 0.75),
+    adaptive_median = median(adaptive_unimputed),
+    adaptive_Q1 = quantile(adaptive_unimputed, 0.25),
+    adaptive_Q3 = quantile(adaptive_unimputed, 0.75)
+  )
+
+# Print results
+print(summary_stats)
+write.table(summary_stats, "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/celltypes_innate_adaptive_median_quartile_summary.txt", sep = "\t", quote = F, row.names = F, col.names = T)
+
+
+### Putting the filter of more than 10 cells
+sample_freq <- as.data.frame(table(Ind_cell$individuals_celltype))
+req_samples <- sample_freq[sample_freq$Freq > 10,"Var1"]
+Ind_cell_req <- Ind_cell[grep(paste(req_samples, collapse = "|"), Ind_cell$individuals_celltype),] 
+
+# Calculate median and quartiles per Antigen (Ag)
+summary_stats <- Ind_cell_req %>%
+  group_by(individuals_celltype) %>%
+  summarise(
+    innate_median = median(innate_unimputed),
+    innate_Q1 = quantile(innate_unimputed, 0.25),
+    innate_Q3 = quantile(innate_unimputed, 0.75),
+    adaptive_median = median(adaptive_unimputed),
+    adaptive_Q1 = quantile(adaptive_unimputed, 0.25),
+    adaptive_Q3 = quantile(adaptive_unimputed, 0.75)
+  )
+
+# Print results
+print(summary_stats)
+write.table(summary_stats, "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/celltypes_sample_ls_10_remve_innate_adaptive_median_quartile_summary.txt", sep = "\t", quote = F, row.names = F, col.names = T)

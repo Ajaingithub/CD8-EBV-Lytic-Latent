@@ -91,3 +91,103 @@ train(model, dataloader)
 
 # while on the c4-n38 and c4-n39 it is NVIDIA A100 80GB PCIe MIG 1g.10gb i.e. it is divided into 7 10GB MIGs. While the head node GPU node NVIDIA RTX A4000 use the full
 # memory to run which is much faster. We cannot use 2 instances at a time which makes it very slow. So the admin has to provide the entire GPU to train for a time being. 
+
+#### Predicting the TCR-pMHC using the EPACT dataset
+# predict cross-validation results
+cd /diazlab/data3/.abhinav/tools/EPACT
+for i in {1..5}
+do
+    python scripts/predict/predict_tcr_pmhc_binding.py \
+        --config configs/config-paired-cdr123-pmhc-binding.yml \
+        --input_data_path data/binding/Full-TCR/k-fold-data/val_fold_${i}.csv \
+        --model_location checkpoints/paired-cdr123-pmhc-binding/paired-cdr123-pmhc-binding-model-fold-${i}.pt\
+        --log_dir results/preds-cdr123-pmhc-binding/Fold_${i}/
+done
+
+# predict distance matrices and contact sites between MEL8 TCR and HLA-A2-presented peptides.
+cd /diazlab/data3/.abhinav/tools/EPACT
+for i in {1..5}
+do
+    python scripts/predict/predict_tcr_pmhc_interact.py --config configs/config-paired-cdr123-pmhc-interact.yml \
+        --input_data_path data/MEL8_A0201_peptides.csv \
+        --model_location checkpoints/paired-cdr123-pmhc-interaction/paired-cdr123-pmhc-interaction-model-fold-${i}.pt \
+        --log_dir results/interaction-MEL8-bg-cdr123-closest/Fold_${i}/
+done
+
+import pickle
+
+# Open the .pkl file in read-binary mode
+with open('/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/results/interaction-CD8-EBV-bg-cdr123-closest_all_unique/predictions.pkl', 'rb') as file:
+    # Load the object from the file
+    data = pickle.load(file)
+
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+from pathlib import Path
+import pandas as pd
+savedir = "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/EPACT/results/interaction-CD8-EBV-bg-cdr123-closest_all_unique/"
+
+# Collect the distance matrices for epitope "ALWALPHAA"
+epitopes = list(set([entry['epitope'] for entry in data]))
+cdrs = ["cdr1.alpha","cdr3.alpha","cdr3.beta"]
+
+for epit in epitopes:
+    for cdr in cdrs:
+        distance_matrices = []
+        for entry in data:
+            if entry['epitope'] == epit:
+                distance_matrices.append(entry['dist'][cdr])
+        
+        concatenated_matrix = np.concatenate(distance_matrices, axis=0)
+        amino_acids = list(epit)
+        column_means = np.mean(concatenated_matrix, axis=0)
+        column_std = np.std(concatenated_matrix, axis=0)
+
+        plt.figure(figsize=(5, 3))
+        bars = plt.bar(range(len(column_means)), column_means, yerr=column_std, capsize=5, color='skyblue', label='Mean Values')
+        plt.xticks(range(len(amino_acids)), amino_acids)
+        plt.xlabel("Epitope "+epit+" amino acid")
+        plt.ylabel(cdr +" distance")
+        plt.title(epit)
+        plt.legend()
+        plt.tight_layout()
+        os.makedirs(Path(savedir,"distance/"), exist_ok=True)
+        full_path = Path(savedir,"distance/") / (epit + "_" + cdr +"_distance.pdf")
+        plt.savefig(full_path)
+        df = pd.DataFrame(data=concatenated_matrix, columns = amino_acids)  # 1st row as the column names
+        full_path = Path(savedir,"distance/") / (epit + "_" + cdr +"_distance.csv")
+        df.to_csv(full_path, index =  False)
+
+
+#### Contact
+epitopes = list(set([entry['epitope'] for entry in data]))
+cdrs = ["cdr1.alpha","cdr3.alpha","cdr3.beta"]
+
+for epit in epitopes:
+    for cdr in cdrs:
+        distance_matrices = []
+        for entry in data:
+            if entry['epitope'] == epit:
+                distance_matrices.append(entry['contact'][cdr])
+        
+        concatenated_matrix = np.concatenate(distance_matrices, axis=0)
+        amino_acids = list(epit)
+        column_means = np.mean(concatenated_matrix, axis=0)
+        column_std = np.std(concatenated_matrix, axis=0)
+
+        plt.figure(figsize=(5, 3))
+        bars = plt.bar(range(len(column_means)), column_means, yerr=column_std, capsize=5, color='forestgreen', label='Mean Values')
+        plt.xticks(range(len(amino_acids)), amino_acids)
+        plt.xlabel("Epitope "+epit+" amino acid")
+        plt.ylabel(cdr +" contact score")
+        plt.title(epit)
+        plt.legend()
+        plt.tight_layout()
+        os.makedirs(Path(savedir,"contact/"), exist_ok=True)
+        full_path = Path(savedir,"contact/") / (epit + "_" + cdr +"_contact.pdf")
+        plt.savefig(full_path)
+        df = pd.DataFrame(data=concatenated_matrix, columns = amino_acids)  # 1st row as the column names
+        full_path = Path(savedir,"contact/") / (epit + "_" + cdr +"_contact.csv")
+        df.to_csv(full_path, index =  False)
+
