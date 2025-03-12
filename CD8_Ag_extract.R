@@ -1707,3 +1707,66 @@ summary_stats <- Ind_cell_req %>%
 # Print results
 print(summary_stats)
 write.table(summary_stats, "/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/celltypes_sample_ls_10_remve_innate_adaptive_median_quartile_summary.txt", sep = "\t", quote = F, row.names = F, col.names = T)
+
+### VDJdb data needs to be uploaded 
+library(Seurat)
+library(dplyr)
+CD8_Ag <- readRDS("/diazlab/data3/.abhinav/.immune/cancer_combined/project/resources/GSE275633_CD8_Antigen_BEAM_T.RDS")
+CD8_required <- CD8_Ag@meta.data[, c("TRA1_TRA2_TRB1_TRB2_cdraa", "TRA1_TRA2_TRB1_TRB2_vdjc", "Ag_range_10")]
+CD8_required_noNA <- na.omit(CD8_required)
+# unique_clones <- unique(CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_cdraa)
+
+# CD8_required_noNA_2 <- CD8_required_noNA[match(unique_clones, CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_cdraa),]
+
+### Extracting out Alpha CDR3 amino acids and V and J alpha
+CD8_required_noNA$cdr3.alpha <- gsub("-.*.", "", CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_cdraa) %>%
+    gsub("*.*_", "", .)
+CD8_required_noNA$v.alpha <- gsub("-[A-Z].*.", "", CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_vdjc) %>%
+    gsub("__.*.", "", .)
+CD8_required_noNA$j.alpha <- gsub("-[A-Z].*.", "", CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_vdjc) %>%
+    gsub(".*.__", "", .) %>%
+    gsub("_TRAC", "", .)
+
+# Beta CDR3 amino acid, V, D, J
+CD8_required_noNA$cdr3.beta <- gsub(".*.--", "", CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_cdraa) %>%
+    gsub("-.*.", "", .) %>%
+    gsub(".*._", "", .)
+CD8_required_noNA$v.beta <- gsub(".*.--", "", CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_vdjc) %>%
+    gsub("_.*.", "", .)
+CD8_required_noNA$d.beta <- gsub(".*.--", "", CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_vdjc) %>%
+    gsub("_TRBJ.*.", "", .) %>%
+    gsub("*.*_", "", .) %>%
+    gsub("NA-NA", "", .)
+CD8_required_noNA$j.beta <- gsub(".*.--", "", CD8_required_noNA$TRA1_TRA2_TRB1_TRB2_vdjc) %>%
+    gsub("_TRBC[1-2]*.*", "", .) %>%
+    gsub(".*._", "", .)
+
+
+CD8_required_noNA$cdr3.alpha.beta <- paste(CD8_required_noNA$cdr3.alpha, CD8_required_noNA$cdr3.beta, sep = "_")
+clone_number_df <- as.data.frame(table(CD8_required_noNA$cdr3.alpha.beta))
+
+### Clones greater than 5
+clone_number_df_gt5 <- clone_number_df[clone_number_df$Freq > 5,]
+CD8_required_noNA_gt5 <- CD8_required_noNA[grep(paste0("^",clone_number_df_gt5$Var1,"$",collapse = "|"),CD8_required_noNA$cdr3.alpha.beta),]
+cdr3_Ag_rang10 <- table(CD8_required_noNA_gt5$cdr3.alpha.beta, CD8_required_noNA_gt5$Ag_range_10)
+cdr3_Ag_rang10_colsum <- as.data.frame(rowSums(cdr3_Ag_rang10))
+
+stopifnot(rownames(cdr3_Ag_rang10_colsum) == rownames(cdr3_Ag_rang10))
+
+cdr3_Ag_rang10_percent <- cdr3_Ag_rang10
+for(i in 1:nrow(cdr3_Ag_rang10_colsum)){
+    cdr3_Ag_rang10_percent[i,] <- cdr3_Ag_rang10[i,]/cdr3_Ag_rang10_colsum[i,1]
+}
+
+#### removing the clones with multiple antigen binding
+cdr3_Ag_rang10_percent_spec_Ag <- cdr3_Ag_rang10_percent[,grep(",",colnames(cdr3_Ag_rang10_percent),invert=TRUE)]
+cdr3_Ag_rang10_percent_spec_Ag_gt_0.8 <- cdr3_Ag_rang10_percent_spec_Ag[apply(cdr3_Ag_rang10_percent_spec_Ag, 1, function(row) any(row >= 0.8)), ]
+
+write.table(cdr3_Ag_rang10_percent_spec_Ag_gt_0.8, 
+paste0("/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/cdr3_Ag_rang10_percent_spec_Ag_gt_0.8.txt"), quote = F, row.names = T, col.names = T, sep = "\t")
+
+cdr3_Ag_rang10_rawvalue_gt_0.8 <- cdr3_Ag_rang10[match(rownames(cdr3_Ag_rang10_percent_spec_Ag_gt_0.8), rownames(cdr3_Ag_rang10)),]
+stopifnot(rownames(cdr3_Ag_rang10_rawvalue_gt_0.8) == rownames(cdr3_Ag_rang10_percent_spec_Ag_gt_0.8))
+
+write.table(cdr3_Ag_rang10_rawvalue_gt_0.8, 
+paste0("/diazlab/data3/.abhinav/.immune/CD8-EBV-Lytic-Latent/revision/Table/cdr3_Ag_rang10_rawvalue_gt_0.8.txt"), quote = F, row.names = T, col.names = T, sep = "\t")
